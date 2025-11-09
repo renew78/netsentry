@@ -1,0 +1,16 @@
+---
+# Globale Variablen für alle Hosts
+
+# GitHub Konfiguration
+github_user: vorname.nachname
+github_token: "{{ lookup('env', 'GITHUB_TOKEN') }}"  # Token aus Umgebungsvariable
+
+# RPM Installation Konfiguration
+rpm_download_dir: /opt/tmp
+rpm_owner: apps
+rpm_group: apps
+
+# GitHub Repository Details (Beispiel - bitte anpassen)
+github_repo: "organisation/repository"
+github_rpm_path: "path/to/rpm/file.rpm"  # Pfad zur RPM-Datei im Repository
+rpm_filename: "application.rpm"  # Name der heruntergeladenen RPM-Datei

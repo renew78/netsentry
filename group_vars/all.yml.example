@@ -1,0 +1,26 @@
+---
+# Beispiel-Konfiguration - Kopieren Sie diese Datei zu all.yml und passen Sie die Werte an
+
+# GitHub Konfiguration
+github_user: vorname.nachname
+github_token: "ghp_xxxxxxxxxxxxxxxxxxxx"  # Ihr persönliches GitHub Token
+
+# RPM Installation Konfiguration
+rpm_download_dir: /opt/tmp
+rpm_owner: apps
+rpm_group: apps
+
+# GitHub Repository Details
+github_repo: "organisation/repository-name"
+github_branch: main  # oder master, develop, etc.
+github_rpm_path: "releases/application-1.0.0.rpm"  # Pfad zur RPM-Datei im Repository
+rpm_filename: "application.rpm"  # Name der heruntergeladenen RPM-Datei
+
+# Optional: Pfade, deren Berechtigungen nach Installation angepasst werden sollen
+rpm_installed_paths:
+  - /opt/application
+  - /var/log/application
+  - /etc/application
+
+# RPM Status
+rpm_state: present  # present oder latest

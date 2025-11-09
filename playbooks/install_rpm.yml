@@ -1,0 +1,20 @@
+---
+# Playbook für RPM-Installation auf Oracle Linux
+# Verwendung: ansible-playbook -i hosts.yaml playbooks/install_rpm.yml
+
+- name: RPM-Paket von GitHub herunterladen und installieren
+  hosts: oracle_linux
+  gather_facts: yes
+  become: yes
+
+  tasks:
+    - name: Überprüfen, ob auf Oracle Linux ausgeführt wird
+      ansible.builtin.assert:
+        that:
+          - ansible_distribution == "OracleLinux"
+        fail_msg: "Dieses Playbook ist nur für Oracle Linux vorgesehen!"
+        success_msg: "Oracle Linux {{ ansible_distribution_version }} erkannt"
+
+    - name: RPM-Installation durchführen
+      ansible.builtin.include_role:
+        name: rpm_install

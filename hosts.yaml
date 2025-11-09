@@ -1,0 +1,13 @@
+---
+# Ansible Inventory für Oracle Linux Server
+all:
+  children:
+    oracle_linux:
+      hosts:
+        tawaa:
+          ansible_host: localhost
+          ansible_connection: local
+      vars:
+        ansible_user: admin
+        ansible_become: yes
+        ansible_become_method: sudo

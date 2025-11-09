@@ -1,0 +1,32 @@
+# Ansible
+*.retry
+*.log
+
+# Temporäre Dateien
+/opt/tmp/
+*.rpm
+*.tmp
+
+# Sensible Daten
+*token*
+*secret*
+.vault_pass
+vault_pass.txt
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
