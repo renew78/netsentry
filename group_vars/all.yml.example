@@ -1,26 +1,32 @@
 ---
-# Beispiel-Konfiguration - Kopieren Sie diese Datei zu all.yml und passen Sie die Werte an
+# Beispiel-Konfiguration für globale Variablen
+# Kopieren Sie diese Datei nach all.yml und passen Sie die Werte an:
+# cp group_vars/all.yml.example group_vars/all.yml
 
 # GitHub Konfiguration
 github_user: vorname.nachname
-github_token: "ghp_xxxxxxxxxxxxxxxxxxxx"  # Ihr persönliches GitHub Token
+github_token: "{{ lookup('env', 'GITHUB_TOKEN') }}"  # Token aus Umgebungsvariable ODER direkt eintragen
+# Alternativ können Sie das Token auch direkt hier eintragen (NICHT in Git committen!):
+# github_token: "ghp_xxxxxxxxxxxxxxxxxxxx"
 
 # RPM Installation Konfiguration
 rpm_download_dir: /opt/tmp
 rpm_owner: apps
 rpm_group: apps
 
-# GitHub Repository Details
-github_repo: "organisation/repository-name"
-github_branch: main  # oder master, develop, etc.
-github_rpm_path: "releases/application-1.0.0.rpm"  # Pfad zur RPM-Datei im Repository
-rpm_filename: "application.rpm"  # Name der heruntergeladenen RPM-Datei
+# GitHub Repository Details - BITTE ANPASSEN!
+github_repo: "organisation/repository"          # z.B. "myorg/myapp"
+github_branch: "main"                           # oder "master", "develop", etc.
+github_rpm_path: "releases/package.rpm"         # Pfad zur RPM-Datei im Repository
+rpm_filename: "application.rpm"                 # Name der heruntergeladenen RPM-Datei
 
-# Optional: Pfade, deren Berechtigungen nach Installation angepasst werden sollen
-rpm_installed_paths:
-  - /opt/application
-  - /var/log/application
-  - /etc/application
+# Optional: Pfade, die nach der Installation für den apps-User berechtigt werden sollen
+# Kommentieren Sie die folgenden Zeilen ein und passen Sie sie an Ihre Bedürfnisse an:
+# rpm_installed_paths:
+#   - /opt/application
+#   - /var/lib/application
+#   - /etc/application
+#   - /var/log/application
 
-# RPM Status
-rpm_state: present  # present oder latest
+# Optional: RPM State (present = installieren, latest = immer neueste Version)
+rpm_state: present
