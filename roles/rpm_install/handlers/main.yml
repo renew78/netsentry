@@ -1,0 +1,27 @@
+---
+# Handlers für RPM Installation
+# Handlers werden nur ausgeführt, wenn sie von einem Task benachrichtigt werden
+
+- name: restart application service
+  ansible.builtin.systemd:
+    name: "{{ application_service_name }}"
+    state: restarted
+    enabled: yes
+  become: yes
+  when:
+    - application_service_name is defined
+    - application_service_name != ''
+
+- name: reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: yes
+  become: yes
+
+- name: set selinux context
+  ansible.builtin.command:
+    cmd: "restorecon -R {{ item }}"
+  loop: "{{ rpm_installed_paths | default([]) }}"
+  become: yes
+  when:
+    - ansible_selinux.status == "enabled"
+    - rpm_installed_paths is defined

@@ -1,0 +1,13 @@
+---
+# Variablen für RPM Installation
+# Diese Variablen haben höhere Priorität als defaults/main.yml
+
+# Temporäres Verzeichnis für Downloads
+temp_download_dir: "/tmp/ansible_rpm_downloads"
+
+# Timeout für GitHub Downloads (in Sekunden)
+github_download_timeout: 300
+
+# Retry-Konfiguration für Downloads
+download_retries: 3
+download_delay: 5
