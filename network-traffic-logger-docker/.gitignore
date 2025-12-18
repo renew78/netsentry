@@ -1,0 +1,31 @@
+# Environment variables
+.env
+
+# Docker volumes data
+data/
+volumes/
+
+# Node modules (if building locally)
+frontend/node_modules/
+frontend/build/
+
+# Python cache
+backend/**/__pycache__/
+backend/**/*.pyc
+backend/**/*.pyo
+backend/**/.pytest_cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/

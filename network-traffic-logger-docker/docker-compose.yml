@@ -1,0 +1,149 @@
+version: '3.8'
+
+services:
+  # InfluxDB - Time Series Database
+  influxdb:
+    image: influxdb:2.7-alpine
+    container_name: ntl_influxdb
+    restart: unless-stopped
+    ports:
+      - "8086:8086"
+    volumes:
+      - influxdb_data:/var/lib/influxdb2
+      - influxdb_config:/etc/influxdb2
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=${INFLUXDB_ADMIN_USER:-admin}
+      - DOCKER_INFLUXDB_INIT_PASSWORD=${INFLUXDB_ADMIN_PASSWORD:-changeme123}
+      - DOCKER_INFLUXDB_INIT_ORG=${INFLUXDB_ORG:-network-monitoring}
+      - DOCKER_INFLUXDB_INIT_BUCKET=${INFLUXDB_BUCKET:-traffic}
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=${INFLUXDB_ADMIN_TOKEN:-my-super-secret-auth-token}
+    networks:
+      - ntl_network
+    healthcheck:
+      test: ["CMD", "influx", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # PostgreSQL - Metadata Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: ntl_postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-network_traffic}
+      - POSTGRES_USER=${POSTGRES_USER:-ntl_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-changeme123}
+    networks:
+      - ntl_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ntl_user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis - Caching and Real-time State
+  redis:
+    image: redis:7-alpine
+    container_name: ntl_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    networks:
+      - ntl_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # NetFlow/sFlow Collector
+  netflow_collector:
+    build:
+      context: ./backend/netflow_collector
+      dockerfile: Dockerfile
+    container_name: ntl_netflow_collector
+    restart: unless-stopped
+    ports:
+      - "2055:2055/udp"
+      - "6343:6343/udp"
+    volumes:
+      - netflow_data:/data
+    environment:
+      - NETFLOW_PORT=2055
+      - SFLOW_PORT=6343
+      - INFLUXDB_URL=http://influxdb:8086
+      - INFLUXDB_TOKEN=${INFLUXDB_ADMIN_TOKEN:-my-super-secret-auth-token}
+      - INFLUXDB_ORG=${INFLUXDB_ORG:-network-monitoring}
+      - INFLUXDB_BUCKET=${INFLUXDB_BUCKET:-traffic}
+      - REDIS_URL=redis://redis:6379
+    networks:
+      - ntl_network
+    depends_on:
+      influxdb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # Backend API (FastAPI)
+  backend:
+    build:
+      context: ./backend/api
+      dockerfile: Dockerfile
+    container_name: ntl_backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-ntl_user}:${POSTGRES_PASSWORD:-changeme123}@postgres:5432/${POSTGRES_DB:-network_traffic}
+      - INFLUXDB_URL=http://influxdb:8086
+      - INFLUXDB_TOKEN=${INFLUXDB_ADMIN_TOKEN:-my-super-secret-auth-token}
+      - INFLUXDB_ORG=${INFLUXDB_ORG:-network-monitoring}
+      - INFLUXDB_BUCKET=${INFLUXDB_BUCKET:-traffic}
+      - REDIS_URL=redis://redis:6379
+      - SNMP_COMMUNITY=${SNMP_COMMUNITY:-public}
+    networks:
+      - ntl_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      influxdb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # Frontend (React with Material-UI Dark Theme)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - REACT_APP_API_URL=http://${SERVER_IP:-localhost}:8000
+        - REACT_APP_WS_URL=ws://${SERVER_IP:-localhost}:8000/ws
+    container_name: ntl_frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    networks:
+      - ntl_network
+    depends_on:
+      - backend
+
+networks:
+  ntl_network:
+    driver: bridge
+
+volumes:
+  influxdb_data:
+  influxdb_config:
+  postgres_data:
+  redis_data:
+  netflow_data:
