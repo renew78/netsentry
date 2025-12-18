@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Network Traffic Logger - Switch Überwachung</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #0f0f23;
+            color: #e0e0e0;
+            padding: 40px;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 32px;
+        }
+        h1 {
+            font-size: 32px;
+            font-weight: 700;
+            color: #00d4ff;
+        }
+        .btn-add {
+            background: linear-gradient(135deg, #00d4ff 0%, #00a3cc 100%);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .switch-card {
+            background: #1a1a2e;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+        }
+        .switch-header {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid #2a2a3e;
+        }
+        .switch-icon {
+            width: 48px;
+            height: 48px;
+            background: rgba(0, 212, 255, 0.2);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+        .switch-info h3 {
+            font-size: 20px;
+            font-weight: 600;
+            color: #00d4ff;
+        }
+        .switch-info p {
+            color: #a0a0a0;
+            font-size: 14px;
+            margin-top: 4px;
+        }
+        .ports-badge {
+            margin-left: auto;
+            background: rgba(0, 212, 255, 0.2);
+            color: #00d4ff;
+            padding: 8px 16px;
+            border-radius: 20px;
+            border: 1px solid #00d4ff;
+            font-weight: 600;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th {
+            background: #0f0f23;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            color: #a0a0a0;
+            font-size: 12px;
+            text-transform: uppercase;
+        }
+        td {
+            padding: 12px;
+            border-top: 1px solid #2a2a3e;
+        }
+        .port-number {
+            background: rgba(0, 212, 255, 0.2);
+            color: #00d4ff;
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-weight: 600;
+            display: inline-block;
+            min-width: 50px;
+            text-align: center;
+        }
+        .vlan-badge {
+            background: rgba(0, 212, 255, 0.15);
+            color: #00d4ff;
+            padding: 4px 10px;
+            border-radius: 12px;
+            border: 1px solid #00d4ff;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .status-online {
+            background: #00ff88;
+            color: #0f0f23;
+        }
+        .status-offline {
+            background: #ff4444;
+            color: white;
+        }
+        .description {
+            color: #a0a0a0;
+            font-size: 13px;
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .action-btn {
+            background: none;
+            border: none;
+            color: #00d4ff;
+            cursor: pointer;
+            padding: 6px;
+            margin: 0 4px;
+        }
+        .action-btn:hover {
+            color: #00ffaa;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔌 Switch-Verwaltung</h1>
+            <button class="btn-add">➕ Port hinzufügen</button>
+        </div>
+
+        <!-- Switch 1 -->
+        <div class="switch-card">
+            <div class="switch-header">
+                <div class="switch-icon">🔌</div>
+                <div class="switch-info">
+                    <h3>Switch-OG</h3>
+                    <p>192.168.1.10</p>
+                </div>
+                <span class="ports-badge">24 Ports</span>
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Port</th>
+                        <th>Name</th>
+                        <th>VLAN</th>
+                        <th>Status</th>
+                        <th>Geschwindigkeit</th>
+                        <th>Eingehend</th>
+                        <th>Ausgehend</th>
+                        <th>Beschreibung</th>
+                        <th>Aktionen</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><span class="port-number">1</span></td>
+                        <td><strong>Server-1</strong></td>
+                        <td><span class="vlan-badge">VLAN 10</span></td>
+                        <td><span class="status-badge status-online">✓ Online</span></td>
+                        <td>1000 Mbps</td>
+                        <td style="font-family: monospace;">842 MB</td>
+                        <td style="font-family: monospace;">1.2 GB</td>
+                        <td><span class="description">Hauptserver Rack 1, Produktiv-System</span></td>
+                        <td>
+                            <button class="action-btn" title="Bearbeiten">✏️</button>
+                            <button class="action-btn" title="Löschen">🗑️</button>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><span class="port-number">2</span></td>
+                        <td><strong>NAS</strong></td>
+                        <td><span class="vlan-badge">VLAN 20</span></td>
+                        <td><span class="status-badge status-online">✓ Online</span></td>
+                        <td>1000 Mbps</td>
+                        <td style="font-family: monospace;">3.4 GB</td>
+                        <td style="font-family: monospace;">512 MB</td>
+                        <td><span class="description">Storage Server - Backup System</span></td>
+                        <td>
+                            <button class="action-btn" title="Bearbeiten">✏️</button>
+                            <button class="action-btn" title="Löschen">🗑️</button>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><span class="port-number">3</span></td>
+                        <td><strong>AP-1</strong></td>
+                        <td><span class="vlan-badge">VLAN 30</span></td>
+                        <td><span class="status-badge status-online">✓ Online</span></td>
+                        <td>1000 Mbps</td>
+                        <td style="font-family: monospace;">1.8 GB</td>
+                        <td style="font-family: monospace;">2.1 GB</td>
+                        <td><span class="description">Access Point Obergeschoss</span></td>
+                        <td>
+                            <button class="action-btn" title="Bearbeiten">✏️</button>
+                            <button class="action-btn" title="Löschen">🗑️</button>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><span class="port-number">4</span></td>
+                        <td><strong>Dev-PC</strong></td>
+                        <td><span class="vlan-badge">VLAN 10</span></td>
+                        <td><span class="status-badge status-offline">✗ Offline</span></td>
+                        <td>-</td>
+                        <td style="font-family: monospace;">0 B</td>
+                        <td style="font-family: monospace;">0 B</td>
+                        <td><span class="description">Entwickler Workstation</span></td>
+                        <td>
+                            <button class="action-btn" title="Bearbeiten">✏️</button>
+                            <button class="action-btn" title="Löschen">🗑️</button>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><span class="port-number">24</span></td>
+                        <td><strong>Uplink</strong></td>
+                        <td><span class="vlan-badge">VLAN 1</span></td>
+                        <td><span class="status-badge status-online">✓ Online</span></td>
+                        <td>1000 Mbps</td>
+                        <td style="font-family: monospace;">8.2 GB</td>
+                        <td style="font-family: monospace;">4.8 GB</td>
+                        <td><span class="description">Uplink zum Core-Switch</span></td>
+                        <td>
+                            <button class="action-btn" title="Bearbeiten">✏️</button>
+                            <button class="action-btn" title="Löschen">🗑️</button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Switch 2 -->
+        <div class="switch-card">
+            <div class="switch-header">
+                <div class="switch-icon">🔌</div>
+                <div class="switch-info">
+                    <h3>Switch-EG</h3>
+                    <p>192.168.1.11</p>
+                </div>
+                <span class="ports-badge">8 Ports</span>
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Port</th>
+                        <th>Name</th>
+                        <th>VLAN</th>
+                        <th>Status</th>
+                        <th>Geschwindigkeit</th>
+                        <th>Eingehend</th>
+                        <th>Ausgehend</th>
+                        <th>Beschreibung</th>
+                        <th>Aktionen</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><span class="port-number">1</span></td>
+                        <td><strong>Drucker</strong></td>
+                        <td><span class="vlan-badge">VLAN 40</span></td>
+                        <td><span class="status-badge status-online">✓ Online</span></td>
+                        <td>100 Mbps</td>
+                        <td style="font-family: monospace;">124 MB</td>
+                        <td style="font-family: monospace;">2.1 MB</td>
+                        <td><span class="description">HP LaserJet Pro - Büro EG</span></td>
+                        <td>
+                            <button class="action-btn" title="Bearbeiten">✏️</button>
+                            <button class="action-btn" title="Löschen">🗑️</button>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><span class="port-number">2</span></td>
+                        <td><strong>IP-Kamera-1</strong></td>
+                        <td><span class="vlan-badge">VLAN 50</span></td>
+                        <td><span class="status-badge status-online">✓ Online</span></td>
+                        <td>100 Mbps</td>
+                        <td style="font-family: monospace;">8 MB</td>
+                        <td style="font-family: monospace;">842 MB</td>
+                        <td><span class="description">Eingangsbereich Kamera</span></td>
+                        <td>
+                            <button class="action-btn" title="Bearbeiten">✏️</button>
+                            <button class="action-btn" title="Löschen">🗑️</button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</body>
+</html>

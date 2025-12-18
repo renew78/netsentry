@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Network Traffic Logger - Dashboard Preview</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            background: #0f0f23;
+            color: #e0e0e0;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 260px;
+            height: 100vh;
+            background: #1a1a2e;
+            box-shadow: 4px 0 20px rgba(0, 0, 0, 0.5);
+            z-index: 100;
+        }
+
+        .sidebar-header {
+            background: linear-gradient(135deg, #00d4ff 0%, #00a3cc 100%);
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .sidebar-header svg {
+            width: 32px;
+            height: 32px;
+            fill: white;
+        }
+
+        .sidebar-header h1 {
+            color: white;
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        .menu {
+            padding: 16px 12px;
+        }
+
+        .menu-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            margin-bottom: 6px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: #a0a0a0;
+        }
+
+        .menu-item:hover {
+            background: rgba(0, 212, 255, 0.1);
+            color: #00d4ff;
+        }
+
+        .menu-item.active {
+            background: rgba(0, 212, 255, 0.15);
+            color: #00d4ff;
+            font-weight: 600;
+        }
+
+        .menu-item svg {
+            width: 24px;
+            height: 24px;
+            fill: currentColor;
+        }
+
+        /* Main Content */
+        .main-content {
+            margin-left: 260px;
+            padding: 24px;
+            min-height: 100vh;
+        }
+
+        .header {
+            background: linear-gradient(90deg, rgba(26, 26, 46, 0.95) 0%, rgba(15, 15, 35, 0.95) 100%);
+            padding: 20px 24px;
+            margin: -24px -24px 24px -24px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+        }
+
+        .header h2 {
+            font-size: 28px;
+            font-weight: 700;
+        }
+
+        /* Stats Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 24px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: #1a1a2e;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+            position: relative;
+            overflow: visible;
+        }
+
+        .stat-card-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .stat-label {
+            font-size: 14px;
+            color: #a0a0a0;
+            margin-bottom: 8px;
+        }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: 700;
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+        }
+
+        .stat-unit {
+            font-size: 20px;
+            color: #a0a0a0;
+        }
+
+        .stat-icon {
+            width: 56px;
+            height: 56px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .stat-icon svg {
+            width: 32px;
+            height: 32px;
+        }
+
+        .trend {
+            margin-top: 8px;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .trend svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        /* Chart Cards */
+        .chart-card {
+            background: #1a1a2e;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+            margin-bottom: 24px;
+        }
+
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .chart-title {
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .live-badge {
+            background: #00ff88;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .chart-placeholder {
+            height: 300px;
+            background: linear-gradient(135deg, rgba(0, 212, 255, 0.1) 0%, rgba(0, 163, 204, 0.05) 100%);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .chart-line {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 60%;
+            background: linear-gradient(to top, rgba(0, 212, 255, 0.3) 0%, transparent 100%);
+            clip-path: polygon(
+                0% 80%, 10% 60%, 20% 70%, 30% 40%, 40% 50%,
+                50% 30%, 60% 40%, 70% 20%, 80% 35%, 90% 25%, 100% 15%,
+                100% 100%, 0% 100%
+            );
+        }
+
+        .chart-grid {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image:
+                linear-gradient(rgba(42, 42, 62, 0.5) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(42, 42, 62, 0.5) 1px, transparent 1px);
+            background-size: 50px 50px;
+        }
+
+        /* Area Chart */
+        .area-chart {
+            height: 350px;
+            background: linear-gradient(135deg, rgba(0, 212, 255, 0.05) 0%, transparent 100%);
+            border-radius: 8px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .area-chart-layer {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            opacity: 0.8;
+        }
+
+        .area-inbound {
+            height: 40%;
+            background: linear-gradient(to top, rgba(0, 255, 136, 0.4) 0%, transparent 100%);
+            clip-path: polygon(
+                0% 100%, 5% 80%, 10% 85%, 15% 70%, 20% 75%, 25% 60%,
+                30% 65%, 35% 55%, 40% 60%, 45% 50%, 50% 55%, 55% 45%,
+                60% 50%, 65% 40%, 70% 45%, 75% 35%, 80% 40%, 85% 30%,
+                90% 35%, 95% 25%, 100% 30%, 100% 100%
+            );
+        }
+
+        .area-outbound {
+            height: 60%;
+            background: linear-gradient(to top, rgba(255, 170, 0, 0.4) 0%, transparent 100%);
+            clip-path: polygon(
+                0% 100%, 5% 70%, 10% 75%, 15% 60%, 20% 65%, 25% 50%,
+                30% 55%, 35% 45%, 40% 50%, 45% 40%, 50% 45%, 55% 35%,
+                60% 40%, 65% 30%, 70% 35%, 75% 25%, 80% 30%, 85% 20%,
+                90% 25%, 95% 15%, 100% 20%, 100% 100%
+            );
+        }
+
+        .area-internal {
+            height: 80%;
+            background: linear-gradient(to top, rgba(0, 212, 255, 0.4) 0%, transparent 100%);
+            clip-path: polygon(
+                0% 100%, 5% 90%, 10% 85%, 15% 80%, 20% 85%, 25% 75%,
+                30% 80%, 35% 70%, 40% 75%, 45% 65%, 50% 70%, 55% 60%,
+                60% 65%, 65% 55%, 70% 60%, 75% 50%, 80% 55%, 85% 45%,
+                90% 50%, 95% 40%, 100% 45%, 100% 100%
+            );
+        }
+
+        /* Legend */
+        .legend {
+            display: flex;
+            gap: 24px;
+            margin-top: 16px;
+            justify-content: center;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+        }
+
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 2px;
+        }
+
+        /* Colors */
+        .color-primary { color: #00d4ff; }
+        .color-success { color: #00ff88; }
+        .color-warning { color: #ffaa00; }
+        .color-secondary { color: #ff6b9d; }
+
+        .bg-primary { background: rgba(0, 212, 255, 0.2); }
+        .bg-success { background: rgba(0, 255, 136, 0.2); }
+        .bg-warning { background: rgba(255, 170, 0, 0.2); }
+        .bg-secondary { background: rgba(255, 107, 157, 0.2); }
+    </style>
+</head>
+<body>
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <svg viewBox="0 0 24 24">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+            </svg>
+            <h1>Network Traffic</h1>
+        </div>
+        <div class="menu">
+            <div class="menu-item active">
+                <svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
+                <span>Dashboard</span>
+            </div>
+            <div class="menu-item">
+                <svg viewBox="0 0 24 24"><path d="M4 6h18V4H4c-1.1 0-2 .9-2 2v11H0v3h14v-3H4V6zm19 2h-6c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h6c.55 0 1-.45 1-1V9c0-.55-.45-1-1-1zm-1 9h-4v-7h4v7z"/></svg>
+                <span>Geräte</span>
+            </div>
+            <div class="menu-item">
+                <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+                <span>Switches</span>
+            </div>
+            <div class="menu-item">
+                <svg viewBox="0 0 24 24"><path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg>
+                <span>Verlauf</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <div class="header">
+            <h2>Netzwerk-Übersicht</h2>
+        </div>
+
+        <!-- Stats Cards -->
+        <div class="stats-grid">
+            <!-- Total Traffic -->
+            <div class="stat-card">
+                <div class="stat-card-content">
+                    <div>
+                        <div class="stat-label">Gesamter Traffic</div>
+                        <div class="stat-value color-primary">
+                            1.24
+                            <span class="stat-unit">GB</span>
+                        </div>
+                        <div class="trend color-success">
+                            <svg viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z"/>
+                            </svg>
+                            12% zur letzten Stunde
+                        </div>
+                    </div>
+                    <div class="stat-icon bg-primary">
+                        <svg viewBox="0 0 24 24" fill="#00d4ff">
+                            <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Inbound -->
+            <div class="stat-card">
+                <div class="stat-card-content">
+                    <div>
+                        <div class="stat-label">Eingehend</div>
+                        <div class="stat-value color-success">
+                            512
+                            <span class="stat-unit">MB</span>
+                        </div>
+                        <div class="trend color-success">
+                            <svg viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z"/>
+                            </svg>
+                            8% zur letzten Stunde
+                        </div>
+                    </div>
+                    <div class="stat-icon bg-success">
+                        <svg viewBox="0 0 24 24" fill="#00ff88">
+                            <path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z"/>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Outbound -->
+            <div class="stat-card">
+                <div class="stat-card-content">
+                    <div>
+                        <div class="stat-label">Ausgehend</div>
+                        <div class="stat-value color-warning">
+                            728
+                            <span class="stat-unit">MB</span>
+                        </div>
+                        <div class="trend color-warning">
+                            <svg viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M16 18l2.29-2.29-4.88-4.88-4 4L2 7.41 3.41 6l6 6 4-4 6.3 6.29L22 12v6z"/>
+                            </svg>
+                            15% zur letzten Stunde
+                        </div>
+                    </div>
+                    <div class="stat-icon bg-warning">
+                        <svg viewBox="0 0 24 24" fill="#ffaa00">
+                            <path d="M16 18l2.29-2.29-4.88-4.88-4 4L2 7.41 3.41 6l6 6 4-4 6.3 6.29L22 12v6z"/>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Active Devices -->
+            <div class="stat-card">
+                <div class="stat-card-content">
+                    <div>
+                        <div class="stat-label">Aktive Geräte</div>
+                        <div class="stat-value color-secondary">
+                            24
+                            <span class="stat-unit">Geräte</span>
+                        </div>
+                        <div class="trend color-success">
+                            <svg viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z"/>
+                            </svg>
+                            3 neue seit letzter Stunde
+                        </div>
+                    </div>
+                    <div class="stat-icon bg-secondary">
+                        <svg viewBox="0 0 24 24" fill="#ff6b9d">
+                            <path d="M4 6h18V4H4c-1.1 0-2 .9-2 2v11H0v3h14v-3H4V6zm19 2h-6c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h6c.55 0 1-.45 1-1V9c0-.55-.45-1-1-1zm-1 9h-4v-7h4v7z"/>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Real-time Traffic Chart -->
+        <div class="chart-card">
+            <div class="chart-header">
+                <h3 class="chart-title">Echtzeit Traffic</h3>
+                <span class="live-badge">Live</span>
+            </div>
+            <div class="chart-placeholder">
+                <div class="chart-grid"></div>
+                <div class="chart-line"></div>
+            </div>
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #00d4ff;"></div>
+                    <span>Bytes/s</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #ff6b9d;"></div>
+                    <span>Pakete/s</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Traffic Distribution Chart -->
+        <div class="chart-card">
+            <div class="chart-header">
+                <h3 class="chart-title">Traffic-Verteilung (Letzte Stunde)</h3>
+            </div>
+            <div class="area-chart">
+                <div class="chart-grid"></div>
+                <div class="area-chart-layer area-internal"></div>
+                <div class="area-chart-layer area-outbound"></div>
+                <div class="area-chart-layer area-inbound"></div>
+            </div>
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #00ff88;"></div>
+                    <span>Eingehend</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #ffaa00;"></div>
+                    <span>Ausgehend</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #00d4ff;"></div>
+                    <span>Intern</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

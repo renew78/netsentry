@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Network Traffic Logger - Geräte Ansicht</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #0f0f23;
+            color: #e0e0e0;
+            padding: 40px;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        h1 {
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 32px;
+            color: #00d4ff;
+        }
+        .search-card {
+            background: #1a1a2e;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+        }
+        .search-input {
+            width: 100%;
+            padding: 12px 16px;
+            background: #0f0f23;
+            border: 2px solid #2a2a3e;
+            border-radius: 8px;
+            color: #e0e0e0;
+            font-size: 16px;
+        }
+        .search-input:focus {
+            outline: none;
+            border-color: #00d4ff;
+        }
+        .table-card {
+            background: #1a1a2e;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th {
+            background: #0f0f23;
+            padding: 16px;
+            text-align: left;
+            font-weight: 600;
+            color: #a0a0a0;
+            font-size: 14px;
+            text-transform: uppercase;
+        }
+        td {
+            padding: 16px;
+            border-top: 1px solid #2a2a3e;
+        }
+        tr:hover {
+            background: rgba(0, 212, 255, 0.05);
+        }
+        .device-icon {
+            display: inline-block;
+            width: 32px;
+            height: 32px;
+            background: rgba(0, 212, 255, 0.2);
+            border-radius: 8px;
+            text-align: center;
+            line-height: 32px;
+            color: #00d4ff;
+        }
+        .ip-address {
+            font-family: 'Courier New', monospace;
+            font-weight: 600;
+            color: #00d4ff;
+        }
+        .direction-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            border-radius: 16px;
+            font-size: 12px;
+            font-weight: 600;
+            border: 1px solid;
+        }
+        .direction-outbound {
+            background: rgba(255, 170, 0, 0.15);
+            color: #ffaa00;
+            border-color: #ffaa00;
+        }
+        .direction-inbound {
+            background: rgba(0, 255, 136, 0.15);
+            color: #00ff88;
+            border-color: #00ff88;
+        }
+        .direction-bidirectional {
+            background: rgba(0, 212, 255, 0.15);
+            color: #00d4ff;
+            border-color: #00d4ff;
+        }
+        .status-badge {
+            padding: 6px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .status-active { background: #00ff88; color: #0f0f23; }
+        .status-recent { background: #ffaa00; color: #0f0f23; }
+        .status-inactive { background: #ff4444; color: white; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🖥️ Netzwerk-Geräte</h1>
+
+        <div class="search-card">
+            <input type="text" class="search-input" placeholder="🔍 Suche nach IP, Hostname oder MAC-Adresse...">
+        </div>
+
+        <div class="table-card">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Gerät</th>
+                        <th>IP-Adresse</th>
+                        <th>Hostname</th>
+                        <th>MAC-Adresse</th>
+                        <th>Datenfluss</th>
+                        <th>Gesendet</th>
+                        <th>Empfangen</th>
+                        <th>Letzte Aktivität</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><span class="device-icon">🖥️</span></td>
+                        <td><span class="ip-address">192.168.1.10</span></td>
+                        <td>server-01.local</td>
+                        <td style="font-family: monospace; font-size: 13px;">AA:BB:CC:DD:EE:01</td>
+                        <td>
+                            <span class="direction-badge direction-outbound">
+                                ⬆️ Hauptsächlich Ausgehend
+                            </span>
+                        </td>
+                        <td>4.2 GB</td>
+                        <td>1.8 GB</td>
+                        <td><span class="status-badge status-active">Gerade eben</span></td>
+                    </tr>
+                    <tr>
+                        <td><span class="device-icon">💾</span></td>
+                        <td><span class="ip-address">192.168.1.20</span></td>
+                        <td>nas-storage.local</td>
+                        <td style="font-family: monospace; font-size: 13px;">AA:BB:CC:DD:EE:02</td>
+                        <td>
+                            <span class="direction-badge direction-inbound">
+                                ⬇️ Hauptsächlich Eingehend
+                            </span>
+                        </td>
+                        <td>512 MB</td>
+                        <td>8.4 GB</td>
+                        <td><span class="status-badge status-active">Gerade eben</span></td>
+                    </tr>
+                    <tr>
+                        <td><span class="device-icon">📱</span></td>
+                        <td><span class="ip-address">192.168.1.105</span></td>
+                        <td>iphone-max.local</td>
+                        <td style="font-family: monospace; font-size: 13px;">AA:BB:CC:DD:EE:03</td>
+                        <td>
+                            <span class="direction-badge direction-bidirectional">
+                                ⬌ Bidirektional
+                            </span>
+                        </td>
+                        <td>328 MB</td>
+                        <td>445 MB</td>
+                        <td><span class="status-badge status-recent">Vor 3 Min.</span></td>
+                    </tr>
+                    <tr>
+                        <td><span class="device-icon">🖨️</span></td>
+                        <td><span class="ip-address">192.168.1.50</span></td>
+                        <td>hp-printer.local</td>
+                        <td style="font-family: monospace; font-size: 13px;">AA:BB:CC:DD:EE:04</td>
+                        <td>
+                            <span class="direction-badge direction-inbound">
+                                ⬇️ Hauptsächlich Eingehend
+                            </span>
+                        </td>
+                        <td>2.1 MB</td>
+                        <td>124 MB</td>
+                        <td><span class="status-badge status-recent">Vor 15 Min.</span></td>
+                    </tr>
+                    <tr>
+                        <td><span class="device-icon">📺</span></td>
+                        <td><span class="ip-address">192.168.1.88</span></td>
+                        <td>smart-tv.local</td>
+                        <td style="font-family: monospace; font-size: 13px;">AA:BB:CC:DD:EE:05</td>
+                        <td>
+                            <span class="direction-badge direction-bidirectional">
+                                ⬌ Bidirektional
+                            </span>
+                        </td>
+                        <td>1.2 GB</td>
+                        <td>3.4 GB</td>
+                        <td><span class="status-badge status-inactive">Vor 2 Std.</span></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div style="margin-top: 16px; text-align: center; color: #a0a0a0; font-size: 14px;">
+            Gesamt: 24 Geräte • Aktualisiert alle 10 Sekunden
+        </div>
+    </div>
+</body>
+</html>
