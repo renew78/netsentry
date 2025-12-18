@@ -1,0 +1,9 @@
+---
+# Handlers for network_traffic_logger role
+
+- name: Restart Network Traffic Logger
+  community.docker.docker_compose:
+    project_src: "{{ ntl_install_dir }}"
+    state: present
+    restarted: true
+  become: true

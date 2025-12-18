@@ -1,33 +1,101 @@
-# Ansible RPM Installation für Oracle Linux
+# Ansible Automation Project
 
-Dieses Ansible-Projekt installiert RPM-Pakete von GitHub auf Oracle Linux Servern.
+Dieses Ansible-Projekt enthält verschiedene Rollen für Server-Management und Netzwerk-Monitoring.
 
-## Struktur
+## 🎯 Verfügbare Rollen
+
+### 1. RPM Installation (`rpm_install`)
+Installiert RPM-Pakete von GitHub auf Oracle Linux Servern.
+
+### 2. Network Traffic Logger (`network_traffic_logger`) ⭐ NEU!
+Umfassende Netzwerk-Traffic-Monitoring-Lösung mit:
+- 🌐 NetFlow/sFlow Collector für OPNsense
+- 📊 Moderne Dark-Theme Web-GUI (React + Material-UI)
+- 🔄 Echtzeit-Traffic-Graphen
+- 🔌 TP-Link Switch Port-Überwachung via SNMP
+- 📈 Geräte-Tracking (IP, Hostname, Datenfluss-Richtung)
+- 🗄️ InfluxDB + PostgreSQL + Redis Backend
+- 🐳 Vollständig containerisiert mit Docker Compose
+
+## 📁 Struktur
 
 ```
 .
-├── ansible.cfg                 # Ansible Konfiguration
-├── hosts.yaml                  # Inventory-Datei
+├── ansible.cfg                          # Ansible Konfiguration
+├── hosts.yaml                           # Inventory-Datei
 ├── group_vars/
-│   ├── all.yml                # Globale Variablen (NICHT in Git committen!)
-│   └── all.yml.example        # Beispiel-Konfiguration
+│   ├── all.yml                         # Globale Variablen (NICHT in Git committen!)
+│   └── all.yml.example                 # Beispiel-Konfiguration
 ├── playbooks/
-│   └── install_rpm.yml        # Haupt-Playbook für RPM-Installation
+│   ├── install_rpm.yml                 # RPM-Installation
+│   └── deploy_network_traffic_logger.yml # Network Traffic Logger
 └── roles/
-    └── rpm_install/           # Rolle für RPM-Installation
+    ├── rpm_install/                    # Rolle für RPM-Installation
+    │   ├── defaults/
+    │   ├── tasks/
+    │   └── README.md
+    └── network_traffic_logger/         # Rolle für Netzwerk-Monitoring
         ├── defaults/
-        │   └── main.yml       # Standard-Variablen
-        └── tasks/
-            └── main.yml       # Installation Tasks
+        ├── tasks/
+        ├── templates/
+        ├── files/
+        │   ├── backend/
+        │   │   ├── api/                # FastAPI Backend
+        │   │   └── netflow_collector/  # NetFlow/sFlow Collector
+        │   └── frontend/               # React Frontend
+        │       ├── src/
+        │       └── public/
+        ├── handlers/
+        ├── meta/
+        └── README.md
+```
+
+## 🚀 Quick Start
+
+### Network Traffic Logger installieren
+
+```bash
+# 1. Konfiguration anpassen
+cp group_vars/all.yml.example group_vars/all.yml
+nano group_vars/all.yml  # Passwörter ändern!
+
+# 2. Deployment durchführen
+ansible-playbook playbooks/deploy_network_traffic_logger.yml
+
+# 3. Web-UI öffnen
+# http://<Server-IP>:3000
+```
+
+Siehe [roles/network_traffic_logger/README.md](roles/network_traffic_logger/README.md) für detaillierte Anleitung.
+
+### RPM Installation
+
+```bash
+# 1. Konfiguration
+cp group_vars/all.yml.example group_vars/all.yml
+nano group_vars/all.yml  # GitHub Token eintragen
+
+# 2. Installation
+ansible-playbook playbooks/install_rpm.yml
 ```
 
 ## Voraussetzungen
 
+### Allgemein
 - Ansible 2.9 oder höher
+- Sudo-Rechte auf dem Zielserver
+
+### Für RPM Installation
 - Oracle Linux Zielserver
 - GitHub Personal Access Token mit Lesezugriff auf das Repository
-- Sudo-Rechte auf dem Zielserver
 - User `apps` muss auf dem Zielserver existieren
+
+### Für Network Traffic Logger
+- Docker und Docker Compose
+- Mindestens 4GB RAM
+- Mindestens 50GB freier Speicherplatz
+- OPNsense Firewall (optional, für NetFlow/sFlow)
+- TP-Link Switches mit SNMP (optional)
 
 ## Einrichtung
 

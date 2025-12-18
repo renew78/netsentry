@@ -1,0 +1,134 @@
+---
+# Tasks for network_traffic_logger role
+
+- name: Install required system packages
+  ansible.builtin.package:
+    name:
+      - docker
+      - docker-compose
+      - python3-pip
+      - git
+    state: present
+  become: true
+
+- name: Ensure Docker service is running
+  ansible.builtin.service:
+    name: docker
+    state: started
+    enabled: true
+  become: true
+
+- name: Create installation directory
+  ansible.builtin.file:
+    path: "{{ ntl_install_dir }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+  become: true
+
+- name: Create backend directories
+  ansible.builtin.file:
+    path: "{{ ntl_install_dir }}/backend/{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - api
+    - netflow_collector
+
+- name: Create frontend directories
+  ansible.builtin.file:
+    path: "{{ ntl_install_dir }}/frontend/{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - src
+    - src/components
+    - src/pages
+    - public
+
+- name: Copy Docker Compose configuration
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ ntl_install_dir }}/docker-compose.yml"
+    mode: '0644'
+  notify: Restart Network Traffic Logger
+
+- name: Copy Nginx configuration
+  ansible.builtin.template:
+    src: nginx.conf.j2
+    dest: "{{ ntl_install_dir }}/nginx.conf"
+    mode: '0644'
+  notify: Restart Network Traffic Logger
+
+- name: Copy backend files
+  ansible.builtin.copy:
+    src: "backend/{{ item.src }}"
+    dest: "{{ ntl_install_dir }}/backend/{{ item.dest }}"
+    mode: '0644'
+  loop:
+    - { src: "api/requirements.txt", dest: "api/requirements.txt" }
+    - { src: "api/main.py", dest: "api/main.py" }
+    - { src: "netflow_collector/requirements.txt", dest: "netflow_collector/requirements.txt" }
+    - { src: "netflow_collector/collector.py", dest: "netflow_collector/collector.py" }
+  notify: Restart Network Traffic Logger
+
+- name: Copy frontend files
+  ansible.builtin.copy:
+    src: "frontend/{{ item.src }}"
+    dest: "{{ ntl_install_dir }}/frontend/{{ item.dest }}"
+    mode: '0644'
+  loop:
+    - { src: "package.json", dest: "package.json" }
+    - { src: "public/index.html", dest: "public/index.html" }
+    - { src: "src/index.js", dest: "src/index.js" }
+    - { src: "src/index.css", dest: "src/index.css" }
+    - { src: "src/App.js", dest: "src/App.js" }
+    - { src: "src/components/Layout.js", dest: "src/components/Layout.js" }
+    - { src: "src/pages/Dashboard.js", dest: "src/pages/Dashboard.js" }
+    - { src: "src/pages/Devices.js", dest: "src/pages/Devices.js" }
+    - { src: "src/pages/Switches.js", dest: "src/pages/Switches.js" }
+    - { src: "src/pages/History.js", dest: "src/pages/History.js" }
+  notify: Restart Network Traffic Logger
+
+- name: Create .env file
+  ansible.builtin.template:
+    src: env.j2
+    dest: "{{ ntl_install_dir }}/.env"
+    mode: '0600'
+  notify: Restart Network Traffic Logger
+
+- name: Start Docker containers
+  community.docker.docker_compose:
+    project_src: "{{ ntl_install_dir }}"
+    state: present
+    pull: true
+  become: true
+
+- name: Wait for services to be ready
+  ansible.builtin.wait_for:
+    host: localhost
+    port: "{{ item }}"
+    delay: 10
+    timeout: 300
+  loop:
+    - "{{ backend_port }}"
+    - "{{ frontend_port }}"
+    - "{{ influxdb_port }}"
+    - "{{ postgres_port }}"
+
+- name: Display access information
+  ansible.builtin.debug:
+    msg:
+      - "Network Traffic Logger wurde erfolgreich installiert!"
+      - "Web-UI: http://{{ ansible_default_ipv4.address }}:{{ frontend_port }}"
+      - "API: http://{{ ansible_default_ipv4.address }}:{{ backend_port }}"
+      - "Nginx (Production): http://{{ ansible_default_ipv4.address }}:{{ nginx_port }}"
+      - ""
+      - "OPNsense NetFlow/sFlow Konfiguration:"
+      - "  NetFlow Target: {{ ansible_default_ipv4.address }}:{{ netflow_port }}"
+      - "  sFlow Target: {{ ansible_default_ipv4.address }}:{{ sflow_port }}"
+      - ""
+      - "Datenbanken:"
+      - "  InfluxDB: http://{{ ansible_default_ipv4.address }}:{{ influxdb_port }}"
+      - "  PostgreSQL: {{ ansible_default_ipv4.address }}:{{ postgres_port }}"

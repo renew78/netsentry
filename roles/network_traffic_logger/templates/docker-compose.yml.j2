@@ -1,0 +1,183 @@
+version: '3.8'
+
+services:
+  # InfluxDB - Time Series Database for Network Traffic Data
+  influxdb:
+    image: influxdb:2.7-alpine
+    container_name: ntl_influxdb
+    restart: unless-stopped
+    ports:
+      - "{{ influxdb_port | default('8086') }}:8086"
+    volumes:
+      - influxdb_data:/var/lib/influxdb2
+      - influxdb_config:/etc/influxdb2
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME={{ influxdb_admin_user | default('admin') }}
+      - DOCKER_INFLUXDB_INIT_PASSWORD={{ influxdb_admin_password }}
+      - DOCKER_INFLUXDB_INIT_ORG={{ influxdb_org | default('network-monitoring') }}
+      - DOCKER_INFLUXDB_INIT_BUCKET={{ influxdb_bucket | default('traffic') }}
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN={{ influxdb_admin_token }}
+    networks:
+      - ntl_network
+    healthcheck:
+      test: ["CMD", "influx", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # PostgreSQL - Metadata Database for Device Info and Switch Ports
+  postgres:
+    image: postgres:16-alpine
+    container_name: ntl_postgres
+    restart: unless-stopped
+    ports:
+      - "{{ postgres_port | default('5432') }}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB={{ postgres_db | default('network_traffic') }}
+      - POSTGRES_USER={{ postgres_user | default('ntl_user') }}
+      - POSTGRES_PASSWORD={{ postgres_password }}
+    networks:
+      - ntl_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U {{ postgres_user | default('ntl_user') }}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis - Caching and Real-time State
+  redis:
+    image: redis:7-alpine
+    container_name: ntl_redis
+    restart: unless-stopped
+    ports:
+      - "{{ redis_port | default('6379') }}:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    networks:
+      - ntl_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # NetFlow/sFlow Collector (nfcapd)
+  netflow_collector:
+    image: python:3.11-slim
+    container_name: ntl_netflow_collector
+    restart: unless-stopped
+    ports:
+      - "{{ netflow_port | default('2055') }}:2055/udp"
+      - "{{ sflow_port | default('6343') }}:6343/udp"
+    volumes:
+      - ./backend/netflow_collector:/app
+      - netflow_data:/data
+    working_dir: /app
+    command: >
+      sh -c "apt-get update &&
+             apt-get install -y nfdump &&
+             pip install --no-cache-dir -r requirements.txt &&
+             python collector.py"
+    environment:
+      - NETFLOW_PORT={{ netflow_port | default('2055') }}
+      - SFLOW_PORT={{ sflow_port | default('6343') }}
+      - INFLUXDB_URL=http://influxdb:8086
+      - INFLUXDB_TOKEN={{ influxdb_admin_token }}
+      - INFLUXDB_ORG={{ influxdb_org | default('network-monitoring') }}
+      - INFLUXDB_BUCKET={{ influxdb_bucket | default('traffic') }}
+    networks:
+      - ntl_network
+    depends_on:
+      influxdb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # Backend API (FastAPI)
+  backend:
+    image: python:3.11-slim
+    container_name: ntl_backend
+    restart: unless-stopped
+    ports:
+      - "{{ backend_port | default('8000') }}:8000"
+    volumes:
+      - ./backend/api:/app
+    working_dir: /app
+    command: >
+      sh -c "apt-get update &&
+             apt-get install -y snmp libsnmp-dev &&
+             pip install --no-cache-dir -r requirements.txt &&
+             uvicorn main:app --host 0.0.0.0 --port 8000 --reload"
+    environment:
+      - DATABASE_URL=postgresql://{{ postgres_user | default('ntl_user') }}:{{ postgres_password }}@postgres:5432/{{ postgres_db | default('network_traffic') }}
+      - INFLUXDB_URL=http://influxdb:8086
+      - INFLUXDB_TOKEN={{ influxdb_admin_token }}
+      - INFLUXDB_ORG={{ influxdb_org | default('network-monitoring') }}
+      - INFLUXDB_BUCKET={{ influxdb_bucket | default('traffic') }}
+      - REDIS_URL=redis://redis:6379
+{% if snmp_community is defined %}
+      - SNMP_COMMUNITY={{ snmp_community }}
+{% endif %}
+{% if tplink_switches is defined %}
+      - TPLINK_SWITCHES={{ tplink_switches | to_json }}
+{% endif %}
+    networks:
+      - ntl_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      influxdb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # Frontend (React with Material-UI Dark Theme)
+  frontend:
+    image: node:20-alpine
+    container_name: ntl_frontend
+    restart: unless-stopped
+    ports:
+      - "{{ frontend_port | default('3000') }}:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    working_dir: /app
+    command: sh -c "npm install && npm start"
+    environment:
+      - REACT_APP_API_URL=http://{{ ansible_default_ipv4.address }}:{{ backend_port | default('8000') }}
+      - REACT_APP_WS_URL=ws://{{ ansible_default_ipv4.address }}:{{ backend_port | default('8000') }}/ws
+      - CHOKIDAR_USEPOLLING=true
+    networks:
+      - ntl_network
+    depends_on:
+      - backend
+
+  # Nginx Reverse Proxy (Optional - for production)
+  nginx:
+    image: nginx:alpine
+    container_name: ntl_nginx
+    restart: unless-stopped
+    ports:
+      - "{{ nginx_port | default('80') }}:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - ntl_network
+    depends_on:
+      - frontend
+      - backend
+
+networks:
+  ntl_network:
+    driver: bridge
+
+volumes:
+  influxdb_data:
+  influxdb_config:
+  postgres_data:
+  redis_data:
+  netflow_data:
