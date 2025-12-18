@@ -1,0 +1,92 @@
+---
+- name: Deploy Network Traffic Logger
+  hosts: all
+  become: false
+  vars:
+    # Override default passwords (WICHTIG: Ändern Sie diese Werte!)
+    influxdb_admin_password: "{{ vault_influxdb_password | default('ChangeMe_InfluxDB123!') }}"
+    influxdb_admin_token: "{{ vault_influxdb_token | default('ChangeMe_InfluxDB_Token_Random_String_123456789') }}"
+    postgres_password: "{{ vault_postgres_password | default('ChangeMe_PostgreSQL123!') }}"
+
+    # SNMP Community für TP-Link Switches
+    snmp_community: "public"
+
+    # Ihre TP-Link Switches (Beispiel-Konfiguration)
+    tplink_switches:
+      - ip: "192.168.1.10"
+        name: "Switch-Main"
+        ports:
+          - number: 1
+            name: "Server-1"
+            vlan: 10
+            description: "Hauptserver im Rack 1"
+          - number: 2
+            name: "Server-2"
+            vlan: 10
+            description: "Backup Server"
+          - number: 24
+            name: "Uplink"
+            vlan: 1
+            description: "Uplink zum Router"
+
+  roles:
+    - network_traffic_logger
+
+  post_tasks:
+    - name: Configure firewall for NetFlow/sFlow
+      ansible.posix.firewalld:
+        port: "{{ item }}"
+        permanent: true
+        state: enabled
+        immediate: true
+      loop:
+        - "{{ netflow_port }}/udp"
+        - "{{ sflow_port }}/udp"
+        - "{{ frontend_port }}/tcp"
+        - "{{ backend_port }}/tcp"
+        - "{{ nginx_port }}/tcp"
+      become: true
+      when: ansible_os_family == "RedHat"
+      ignore_errors: true
+
+    - name: Display OPNsense configuration instructions
+      ansible.builtin.debug:
+        msg:
+          - "╔══════════════════════════════════════════════════════════════════╗"
+          - "║       Network Traffic Logger erfolgreich installiert!           ║"
+          - "╚══════════════════════════════════════════════════════════════════╝"
+          - ""
+          - "🌐 Web-Interface:"
+          - "   → http://{{ ansible_default_ipv4.address }}:{{ frontend_port }}"
+          - ""
+          - "📊 OPNsense NetFlow/sFlow Konfiguration:"
+          - "   1. Gehen Sie zu: Services → NetFlow → Settings"
+          - "   2. Aktivieren Sie NetFlow"
+          - "   3. Version: NetFlow v5 oder v9"
+          - "   4. Target IP: {{ ansible_default_ipv4.address }}"
+          - "   5. Target Port: {{ netflow_port }}"
+          - ""
+          - "   Alternativ für sFlow:"
+          - "   1. Gehen Sie zu: Services → sFlow → Settings"
+          - "   2. Collector IP: {{ ansible_default_ipv4.address }}"
+          - "   3. Collector Port: {{ sflow_port }}"
+          - ""
+          - "🔧 TP-Link Switch SNMP Konfiguration:"
+          - "   1. Loggen Sie sich in Ihren TP-Link Switch ein"
+          - "   2. Gehen Sie zu: System Tools → SNMP Settings"
+          - "   3. Aktivieren Sie SNMP"
+          - "   4. SNMP Version: v2c"
+          - "   5. Community Name: {{ snmp_community }}"
+          - "   6. Speichern Sie die Einstellungen"
+          - ""
+          - "📝 Switch-Ports in der Web-UI hinzufügen:"
+          - "   → Navigieren Sie zu 'Switches' → 'Port hinzufügen'"
+          - "   → Tragen Sie IP, Port-Nummer und Beschreibung ein"
+          - ""
+          - "🔐 Standard-Passwörter ändern:"
+          - "   WICHTIG: Ändern Sie die Passwörter in der Datei:"
+          - "   → group_vars/all.yml oder nutzen Sie Ansible Vault"
+          - ""
+          - "📚 Weitere Informationen:"
+          - "   → README: roles/network_traffic_logger/README.md"
+          - ""

@@ -1,0 +1,53 @@
+---
+# Default variables for network_traffic_logger role
+
+# Installation directory
+ntl_install_dir: "/opt/network-traffic-logger"
+
+# Network ports
+netflow_port: 2055
+sflow_port: 6343
+backend_port: 8000
+frontend_port: 3000
+nginx_port: 80
+influxdb_port: 8086
+postgres_port: 5432
+redis_port: 6379
+
+# InfluxDB configuration
+influxdb_admin_user: "admin"
+influxdb_admin_password: "changeme_influx_admin_password"
+influxdb_admin_token: "changeme_influx_admin_token"
+influxdb_org: "network-monitoring"
+influxdb_bucket: "traffic"
+
+# PostgreSQL configuration
+postgres_db: "network_traffic"
+postgres_user: "ntl_user"
+postgres_password: "changeme_postgres_password"
+
+# SNMP configuration (for TP-Link switches)
+snmp_community: "public"
+
+# TP-Link switches to monitor (example)
+# Override this in your playbook or inventory
+tplink_switches: []
+# Example:
+# tplink_switches:
+#   - ip: "192.168.1.10"
+#     name: "Switch-OG"
+#     ports:
+#       - number: 1
+#         name: "Server"
+#         vlan: 10
+#         description: "Hauptserver"
+#   - ip: "192.168.1.11"
+#     name: "Switch-EG"
+#     ports:
+#       - number: 1
+#         name: "NAS"
+#         vlan: 20
+#         description: "Storage Server"
+
+# Docker configuration
+docker_compose_version: "2.23.0"

@@ -1,0 +1,5 @@
+influxdb-client>=1.38.0
+redis>=5.0.0
+python-daemon>=3.0.1
+scapy>=2.5.0
+asyncio>=3.4.3
