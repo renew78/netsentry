@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """
 NetSentry - Backend API
-FastAPI application for network traffic monitoring and switch management with MongoDB
+FastAPI application for network traffic monitoring with OPNsense, AdGuard, and TrueNAS integration
 """
 
 import os
 import json
 import asyncio
+import aiohttp
+import base64
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 from contextlib import asynccontextmanager
@@ -31,13 +33,6 @@ mongo_client = AsyncIOMotorClient(MONGO_URL)
 db = mongo_client['netsentry']
 
 # Pydantic Models
-class SwitchConfig(BaseModel):
-    ip: str
-    name: str
-    username: str
-    password: str
-    type: str = 'tplink'
-
 class VLANConfig(BaseModel):
     id: int
     name: str
@@ -46,8 +41,7 @@ class VLANConfig(BaseModel):
 class AdGuardConfig(BaseModel):
     enabled: bool = False
     url: Optional[str] = ''
-    username: Optional[str] = ''
-    password: Optional[str] = ''
+    apiKey: Optional[str] = ''
 
 class OPNsenseConfig(BaseModel):
     enabled: bool = False
@@ -55,41 +49,31 @@ class OPNsenseConfig(BaseModel):
     apiKey: Optional[str] = ''
     apiSecret: Optional[str] = ''
 
+class TrueNASConfig(BaseModel):
+    enabled: bool = False
+    url: Optional[str] = ''
+    apiKey: Optional[str] = ''
+
 class AIAnalysisConfig(BaseModel):
     enabled: bool = False
 
 class Settings(BaseModel):
-    switches: List[SwitchConfig] = []
     vlans: List[VLANConfig] = []
     adguard: AdGuardConfig = AdGuardConfig()
     opnsense: OPNsenseConfig = OPNsenseConfig()
+    truenas: TrueNASConfig = TrueNASConfig()
     ai_analysis: AIAnalysisConfig = AIAnalysisConfig()
-
-class SwitchPortResponse(BaseModel):
-    id: str
-    switch_ip: str
-    switch_name: str
-    port_number: int
-    port_name: Optional[str]
-    vlan_id: Optional[int]
-    description: Optional[str]
-    is_enabled: bool
-    status: Optional[str] = 'unknown'
-    speed: Optional[str] = None
-    bytes_in: Optional[int] = 0
-    bytes_out: Optional[int] = 0
 
 class DeviceResponse(BaseModel):
     id: str
     ip_address: str
     hostname: Optional[str]
     mac_address: Optional[str]
-    vendor: Optional[str]
     vlan_id: Optional[int] = None
-    first_seen: datetime
-    last_seen: datetime
     bytes_sent: Optional[int] = 0
     bytes_received: Optional[int] = 0
+    bytes_sent_rate: Optional[int] = 0
+    bytes_received_rate: Optional[int] = 0
 
 class TrafficStats(BaseModel):
     timestamp: datetime
@@ -122,19 +106,96 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
+# Helper Functions
+async def get_settings() -> Settings:
+    """Get settings from database"""
+    settings_doc = await db.settings.find_one()
+    if not settings_doc:
+        return Settings()
+    settings_doc.pop('_id', None)
+    return Settings(**settings_doc)
+
+async def opnsense_api_call(endpoint: str, method: str = 'GET', data: dict = None):
+    """Make API call to OPNsense"""
+    settings = await get_settings()
+    if not settings.opnsense.enabled or not settings.opnsense.url:
+        return None
+
+    url = f"{settings.opnsense.url.rstrip('/')}/api{endpoint}"
+    auth = base64.b64encode(f"{settings.opnsense.apiKey}:{settings.opnsense.apiSecret}".encode()).decode()
+
+    headers = {
+        'Authorization': f'Basic {auth}',
+        'Content-Type': 'application/json'
+    }
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.request(method, url, headers=headers, json=data, ssl=False, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                if resp.status == 200:
+                    return await resp.json()
+                return None
+    except Exception as e:
+        print(f"OPNsense API error: {e}")
+        return None
+
+async def adguard_api_call(endpoint: str):
+    """Make API call to AdGuard Home"""
+    settings = await get_settings()
+    if not settings.adguard.enabled or not settings.adguard.url:
+        return None
+
+    url = f"{settings.adguard.url.rstrip('/')}/{endpoint.lstrip('/')}"
+    headers = {}
+
+    if settings.adguard.apiKey:
+        headers['Authorization'] = f'Bearer {settings.adguard.apiKey}'
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                if resp.status == 200:
+                    return await resp.json()
+                return None
+    except Exception as e:
+        print(f"AdGuard API error: {e}")
+        return None
+
+async def truenas_api_call(endpoint: str):
+    """Make API call to TrueNAS Scale"""
+    settings = await get_settings()
+    if not settings.truenas.enabled or not settings.truenas.url:
+        return None
+
+    url = f"{settings.truenas.url.rstrip('/')}/api/v2.0/{endpoint.lstrip('/')}"
+    headers = {
+        'Authorization': f'Bearer {settings.truenas.apiKey}',
+        'Content-Type': 'application/json'
+    }
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, headers=headers, ssl=False, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                if resp.status == 200:
+                    return await resp.json()
+                return None
+    except Exception as e:
+        print(f"TrueNAS API error: {e}")
+        return None
+
 # Application lifecycle
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
     app.state.redis = await redis.from_url(REDIS_URL, decode_responses=True)
     app.state.influx = InfluxDBClientAsync(url=INFLUXDB_URL, token=INFLUXDB_TOKEN, org=INFLUXDB_ORG)
-    
+
     # Initialize default settings if not exists
     if not await db.settings.find_one():
         await db.settings.insert_one(Settings().model_dump())
-    
+
     yield
-    
+
     # Shutdown
     await app.state.redis.close()
     await app.state.influx.close()
@@ -143,8 +204,8 @@ async def lifespan(app: FastAPI):
 # FastAPI app
 app = FastAPI(
     title="NetSentry API",
-    description="API for network traffic monitoring and switch management",
-    version="1.0.0",
+    description="API for network traffic monitoring with OPNsense, AdGuard, and TrueNAS integration",
+    version="2.0.0",
     lifespan=lifespan
 )
 
@@ -160,10 +221,10 @@ app.add_middleware(
 # API Endpoints
 @app.get("/")
 async def root():
-    return {"message": "NetSentry API", "version": "1.0.0"}
+    return {"message": "NetSentry API", "version": "2.0.0"}
 
 @app.get("/api/settings")
-async def get_settings():
+async def get_settings_endpoint():
     """Get application settings"""
     settings = await db.settings.find_one()
     if not settings:
@@ -172,7 +233,7 @@ async def get_settings():
     return settings
 
 @app.post("/api/settings")
-async def save_settings(settings: Settings):
+async def save_settings_endpoint(settings: Settings):
     """Save application settings"""
     await db.settings.delete_many({})
     await db.settings.insert_one(settings.model_dump())
@@ -182,7 +243,7 @@ async def save_settings(settings: Settings):
 async def get_current_stats():
     """Get current traffic statistics"""
     redis_client = app.state.redis
-    
+
     try:
         total_bytes = int(await redis_client.get("stats:total_bytes") or 0)
         total_packets = int(await redis_client.get("stats:total_packets") or 0)
@@ -190,7 +251,7 @@ async def get_current_stats():
         outbound_bytes = int(await redis_client.get("stats:outbound_bytes") or 0)
         internal_bytes = int(await redis_client.get("stats:internal_bytes") or 0)
         devices_active = await redis_client.scard("devices") or 0
-        
+
         return TrafficStats(
             timestamp=datetime.utcnow(),
             total_bytes=total_bytes,
@@ -212,12 +273,12 @@ async def get_traffic_history(
     """Get historical traffic data from InfluxDB"""
     try:
         query_api = app.state.influx.query_api()
-        
+
         if not start:
             start = (datetime.utcnow() - timedelta(hours=1)).isoformat() + "Z"
         if not end:
             end = datetime.utcnow().isoformat() + "Z"
-        
+
         query = f'''
         from(bucket: "{INFLUXDB_BUCKET}")
           |> range(start: {start}, stop: {end})
@@ -225,9 +286,9 @@ async def get_traffic_history(
           |> filter(fn: (r) => r["_field"] == "bytes" or r["_field"] == "packets")
           |> aggregateWindow(every: {interval}, fn: sum, createEmpty: false)
         '''
-        
+
         result = await query_api.query(query)
-        
+
         data = []
         for table in result:
             for record in table.records:
@@ -237,112 +298,231 @@ async def get_traffic_history(
                     'value': record.get_value(),
                     'direction': record.values.get('direction', 'unknown')
                 })
-        
+
         return {'data': data}
-    
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/api/devices", response_model=List[DeviceResponse])
-async def get_devices():
-    """Get all known devices"""
-    try:
-        devices = []
-        redis_client = app.state.redis
-        
-        async for device in db.devices.find():
-            device['id'] = str(device['_id'])
-            device.pop('_id')
-            
-            # Enrich with Redis data
-            device['bytes_sent'] = int(await redis_client.hget(f"device:{device['ip_address']}", "bytes_sent") or 0)
-            device['bytes_received'] = int(await redis_client.hget(f"device:{device['ip_address']}", "bytes_received") or 0)
-            
-            devices.append(device)
-        
-        return devices
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/api/switches/ports", response_model=List[SwitchPortResponse])
-async def get_switch_ports():
-    """Get all switch ports"""
-    try:
-        ports = []
-        async for port in db.switch_ports.find():
-            port['id'] = str(port['_id'])
-            port.pop('_id')
-            ports.append(port)
-        
-        return ports
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-# AdGuard Endpoints
-@app.get("/api/adguard/stats")
-async def get_adguard_stats():
-    """Get AdGuard statistics (stub)"""
-    return {
-        "total_queries": 12459,
-        "blocked_queries": 3421,
-        "allowed_queries": 9038,
-        "blocking_percentage": 27.5
-    }
-
-@app.get("/api/adguard/queries")
-async def get_adguard_queries():
-    """Get AdGuard DNS queries (stub)"""
-    return [
-        {
-            "timestamp": datetime.utcnow().isoformat(),
-            "domain": "tracking.example.com",
-            "client_ip": "10.10.1.100",
-            "client_name": "Device-1",
-            "status": "blocked"
-        },
-        {
-            "timestamp": datetime.utcnow().isoformat(),
-            "domain": "google.com",
-            "client_ip": "10.10.1.101",
-            "client_name": "Device-2",
-            "status": "allowed"
-        }
-    ]
 
 # OPNsense Endpoints
+@app.get("/api/opnsense/devices")
+async def get_opnsense_devices():
+    """Get device list from OPNsense ARP table and DHCP leases"""
+    result = await opnsense_api_call('/diagnostics/interface/getArp')
+    if not result:
+        return []
+
+    devices = []
+    arp_table = result.get('rows', []) if isinstance(result, dict) else result
+
+    for idx, entry in enumerate(arp_table):
+        if isinstance(entry, dict):
+            device = {
+                'id': f"opn-{idx}",
+                'ip_address': entry.get('ip', entry.get('address', '')),
+                'mac_address': entry.get('mac', entry.get('ether', '')),
+                'hostname': entry.get('hostname', entry.get('intf_description', '')),
+                'vlan_id': None,
+                'bytes_sent': 0,
+                'bytes_received': 0,
+                'bytes_sent_rate': 0,
+                'bytes_received_rate': 0,
+            }
+            devices.append(device)
+
+    return devices
+
 @app.get("/api/opnsense/stats")
 async def get_opnsense_stats():
-    """Get OPNsense statistics (stub)"""
+    """Get OPNsense firewall statistics"""
+    result = await opnsense_api_call('/firewall/filter/searchRule')
+
+    if result and isinstance(result, dict):
+        return {
+            "total_rules": result.get('total', 0),
+            "blocked_connections": 0,
+            "allowed_connections": 0,
+            "active_connections": 0
+        }
+
     return {
-        "total_rules": 42,
-        "blocked_connections": 1584,
-        "allowed_connections": 45892,
-        "active_connections": 127
+        "total_rules": 0,
+        "blocked_connections": 0,
+        "allowed_connections": 0,
+        "active_connections": 0
     }
 
 @app.get("/api/opnsense/logs")
 async def get_opnsense_logs():
-    """Get OPNsense firewall logs (stub)"""
-    return [
-        {
-            "timestamp": datetime.utcnow().isoformat(),
-            "action": "block",
-            "source_ip": "192.168.1.100",
-            "dest_ip": "8.8.8.8",
-            "port": 53,
-            "protocol": "UDP",
-            "rule_name": "Block DNS"
-        }
-    ]
+    """Get OPNsense firewall logs"""
+    result = await opnsense_api_call('/firewall/log/list')
+
+    if not result:
+        return []
+
+    logs = []
+    log_entries = result.get('rows', []) if isinstance(result, dict) else result
+
+    for entry in log_entries[:50]:  # Limit to 50 entries
+        if isinstance(entry, dict):
+            logs.append({
+                "timestamp": entry.get('timestamp', datetime.utcnow().isoformat()),
+                "action": entry.get('action', 'unknown'),
+                "source_ip": entry.get('src', ''),
+                "dest_ip": entry.get('dst', ''),
+                "port": entry.get('dst_port', 0),
+                "protocol": entry.get('proto', ''),
+                "rule_name": entry.get('label', 'N/A')
+            })
+
+    return logs
 
 @app.get("/api/opnsense/traffic")
 async def get_opnsense_traffic():
-    """Get OPNsense traffic data (stub)"""
-    return [
-        {"time": "10:00", "allowed": 1250, "blocked": 85},
-        {"time": "10:05", "allowed": 1380, "blocked": 92},
-        {"time": "10:10", "allowed": 1420, "blocked": 78}
-    ]
+    """Get OPNsense traffic data"""
+    result = await opnsense_api_call('/diagnostics/traffic/interface')
+
+    if not result:
+        return []
+
+    traffic_data = []
+    now = datetime.utcnow()
+
+    for i in range(12):  # 12 data points (1 hour at 5-minute intervals)
+        timestamp = (now - timedelta(minutes=i*5)).strftime("%H:%M")
+        traffic_data.insert(0, {
+            "time": timestamp,
+            "allowed": 0,
+            "blocked": 0
+        })
+
+    return traffic_data
+
+# AdGuard Endpoints
+@app.get("/api/adguard/stats")
+async def get_adguard_stats():
+    """Get AdGuard Home statistics"""
+    result = await adguard_api_call('/control/stats')
+
+    if result:
+        return {
+            "total_queries": result.get('num_dns_queries', 0),
+            "blocked_queries": result.get('num_blocked_filtering', 0),
+            "allowed_queries": result.get('num_dns_queries', 0) - result.get('num_blocked_filtering', 0),
+            "blocking_percentage": (result.get('num_blocked_filtering', 0) / max(result.get('num_dns_queries', 1), 1)) * 100
+        }
+
+    return {
+        "total_queries": 0,
+        "blocked_queries": 0,
+        "allowed_queries": 0,
+        "blocking_percentage": 0
+    }
+
+@app.get("/api/adguard/queries")
+async def get_adguard_queries():
+    """Get AdGuard DNS query log"""
+    result = await adguard_api_call('/control/querylog')
+
+    if not result or not isinstance(result, dict):
+        return []
+
+    queries = []
+    data = result.get('data', [])
+
+    for entry in data[:100]:  # Limit to 100 queries
+        queries.append({
+            "timestamp": entry.get('time', datetime.utcnow().isoformat()),
+            "domain": entry.get('question', {}).get('name', ''),
+            "client_ip": entry.get('client', ''),
+            "client_name": entry.get('client_info', {}).get('name', ''),
+            "status": "blocked" if entry.get('reason') in ['FilteredBlackList', 'FilteredBlockedService'] else "allowed"
+        })
+
+    return queries
+
+# TrueNAS Endpoints
+@app.get("/api/truenas/pools")
+async def get_truenas_pools():
+    """Get TrueNAS storage pools"""
+    result = await truenas_api_call('/pool')
+
+    if not result:
+        return []
+
+    pools = []
+    for pool in result:
+        if isinstance(pool, dict):
+            topology = pool.get('topology', {})
+            pools.append({
+                "name": pool.get('name', ''),
+                "status": pool.get('status', 'UNKNOWN'),
+                "size": pool.get('size', 0),
+                "allocated": pool.get('allocated', 0),
+                "free": pool.get('free', 0)
+            })
+
+    return pools
+
+@app.get("/api/truenas/datasets")
+async def get_truenas_datasets():
+    """Get TrueNAS datasets"""
+    result = await truenas_api_call('/pool/dataset')
+
+    if not result:
+        return []
+
+    datasets = []
+    for dataset in result:
+        if isinstance(dataset, dict):
+            datasets.append({
+                "name": dataset.get('name', ''),
+                "type": dataset.get('type', 'FILESYSTEM'),
+                "used": dataset.get('used', {}).get('parsed', 0),
+                "available": dataset.get('available', {}).get('parsed', 0),
+                "compression": dataset.get('compression', {}).get('value', 'off')
+            })
+
+    return datasets
+
+@app.get("/api/truenas/services")
+async def get_truenas_services():
+    """Get TrueNAS services status"""
+    result = await truenas_api_call('/service')
+
+    if not result:
+        return []
+
+    services = []
+    for service in result:
+        if isinstance(service, dict):
+            services.append({
+                "name": service.get('service', ''),
+                "state": service.get('state', 'STOPPED'),
+                "enable": service.get('enable', False)
+            })
+
+    return services
+
+@app.get("/api/truenas/system")
+async def get_truenas_system():
+    """Get TrueNAS system information"""
+    result = await truenas_api_call('/system/info')
+
+    if result and isinstance(result, dict):
+        return {
+            "hostname": result.get('hostname', 'N/A'),
+            "version": result.get('version', 'N/A'),
+            "uptime": result.get('uptime_seconds', 0),
+            "loadavg": ', '.join(map(str, result.get('loadavg', [0, 0, 0])))
+        }
+
+    return {
+        "hostname": "N/A",
+        "version": "N/A",
+        "uptime": "N/A",
+        "loadavg": "N/A"
+    }
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
