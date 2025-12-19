@@ -118,7 +118,15 @@ async def get_settings() -> Settings:
 async def opnsense_api_call(endpoint: str, method: str = 'GET', data: dict = None):
     """Make API call to OPNsense"""
     settings = await get_settings()
-    if not settings.opnsense.enabled or not settings.opnsense.url:
+
+    print(f"[OPNsense] Checking settings - enabled: {settings.opnsense.enabled}, url: {settings.opnsense.url}")
+
+    if not settings.opnsense.enabled:
+        print(f"[OPNsense] Integration is disabled")
+        return None
+
+    if not settings.opnsense.url:
+        print(f"[OPNsense] URL is not configured")
         return None
 
     url = f"{settings.opnsense.url.rstrip('/')}/api{endpoint}"
@@ -129,14 +137,26 @@ async def opnsense_api_call(endpoint: str, method: str = 'GET', data: dict = Non
         'Content-Type': 'application/json'
     }
 
+    print(f"[OPNsense] Making {method} request to: {url}")
+
     try:
         async with aiohttp.ClientSession() as session:
             async with session.request(method, url, headers=headers, json=data, ssl=False, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                print(f"[OPNsense] Response status: {resp.status}, content-type: {resp.content_type}")
+
                 if resp.status == 200:
-                    return await resp.json()
-                return None
+                    if 'application/json' in resp.content_type:
+                        return await resp.json()
+                    else:
+                        text = await resp.text()
+                        print(f"[OPNsense] ERROR: Got HTML instead of JSON. First 500 chars: {text[:500]}")
+                        return None
+                else:
+                    text = await resp.text()
+                    print(f"[OPNsense] ERROR: Status {resp.status}. Response: {text[:500]}")
+                    return None
     except Exception as e:
-        print(f"OPNsense API error: {e}")
+        print(f"[OPNsense] API error: {type(e).__name__}: {e}")
         return None
 
 async def adguard_api_call(endpoint: str):
@@ -397,6 +417,40 @@ async def get_opnsense_traffic():
         })
 
     return traffic_data
+
+@app.get("/api/opnsense/test")
+async def test_opnsense_connection():
+    """Test OPNsense API connection and credentials"""
+    settings = await get_settings()
+
+    if not settings.opnsense.enabled:
+        return {
+            "success": False,
+            "error": "OPNsense integration is disabled. Please enable it in Settings."
+        }
+
+    if not settings.opnsense.url or not settings.opnsense.apiKey or not settings.opnsense.apiSecret:
+        return {
+            "success": False,
+            "error": "OPNsense URL, API Key, or API Secret is missing."
+        }
+
+    # Try a simple API call to test connectivity
+    result = await opnsense_api_call('/diagnostics/interface/getArp')
+
+    if result is not None:
+        return {
+            "success": True,
+            "message": "Successfully connected to OPNsense API",
+            "url": settings.opnsense.url,
+            "device_count": len(result.get('rows', [])) if isinstance(result, dict) else len(result) if isinstance(result, list) else 0
+        }
+    else:
+        return {
+            "success": False,
+            "error": "Failed to connect to OPNsense API. Check the backend logs for details.",
+            "url": settings.opnsense.url
+        }
 
 # AdGuard Endpoints
 @app.get("/api/adguard/stats")
