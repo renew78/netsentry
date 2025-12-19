@@ -133,9 +133,12 @@ async def opnsense_api_call(endpoint: str, method: str = 'GET', data: dict = Non
     auth = base64.b64encode(f"{settings.opnsense.apiKey}:{settings.opnsense.apiSecret}".encode()).decode()
 
     headers = {
-        'Authorization': f'Basic {auth}',
-        'Content-Type': 'application/json'
+        'Authorization': f'Basic {auth}'
     }
+
+    # Only add Content-Type for POST/PUT requests
+    if method in ['POST', 'PUT', 'PATCH']:
+        headers['Content-Type'] = 'application/json'
 
     print(f"[OPNsense] Making {method} request to: {url}")
 
