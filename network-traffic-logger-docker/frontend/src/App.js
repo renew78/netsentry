@@ -4,9 +4,9 @@ import { ThemeProvider, createTheme, CssBaseline } from '@mui/material';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import Devices from './pages/Devices';
-import Switches from './pages/Switches';
 import AdGuard from './pages/AdGuard';
 import OPNsense from './pages/OPNsense';
+import TrueNAS from './pages/TrueNAS';
 import History from './pages/History';
 import Settings from './pages/Settings';
 
@@ -115,9 +115,9 @@ function App() {
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/devices" element={<Devices />} />
-            <Route path="/switches" element={<Switches />} />
             <Route path="/adguard" element={<AdGuard />} />
             <Route path="/opnsense" element={<OPNsense />} />
+            <Route path="/truenas" element={<TrueNAS />} />
             <Route path="/history" element={<History />} />
             <Route path="/settings" element={<Settings />} />
           </Routes>
