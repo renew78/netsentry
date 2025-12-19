@@ -70,7 +70,23 @@ export default function Settings() {
   const fetchSettings = async () => {
     try {
       const response = await axios.get(`${API_URL}/settings`);
-      setSettings(response.data);
+      // Merge with defaults to ensure all fields exist
+      const defaultSettings = {
+        vlans: [],
+        adguard: { enabled: false, url: '', apiKey: '' },
+        opnsense: { enabled: false, url: '', apiKey: '', apiSecret: '' },
+        truenas: { enabled: false, url: '', apiKey: '' },
+        ai_analysis: { enabled: false },
+      };
+      const mergedSettings = {
+        ...defaultSettings,
+        ...response.data,
+        adguard: { ...defaultSettings.adguard, ...(response.data.adguard || {}) },
+        opnsense: { ...defaultSettings.opnsense, ...(response.data.opnsense || {}) },
+        truenas: { ...defaultSettings.truenas, ...(response.data.truenas || {}) },
+        ai_analysis: { ...defaultSettings.ai_analysis, ...(response.data.ai_analysis || {}) },
+      };
+      setSettings(mergedSettings);
     } catch (error) {
       console.error('Error fetching settings:', error);
     }
