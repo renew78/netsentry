@@ -28,8 +28,8 @@ import {
 } from 'recharts';
 import axios from 'axios';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
-const WS_URL = process.env.REACT_APP_WS_URL || 'ws://localhost:8000/ws';
+const API_URL = process.env.REACT_APP_BACKEND_URL || '/api';
+const WS_URL = process.env.REACT_APP_WS_URL || `ws://${window.location.host}/ws`;
 
 const StatCard = ({ title, value, unit, icon, color, trend }) => (
   <Card sx={{ height: '100%', position: 'relative', overflow: 'visible' }}>
