@@ -84,7 +84,9 @@ services:
 
   # Backend API
   backend:
-    image: renew78/netsentry-backend:latest
+    build:
+      context: https://github.com/renew78/ansible.git#claude/network-traffic-logger-NeLSQ
+      dockerfile: network-traffic-logger-docker/backend/Dockerfile
     container_name: netsentry_backend
     restart: unless-stopped
     environment:
@@ -95,6 +97,7 @@ services:
       - INFLUXDB_BUCKET=traffic
       - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
       - SNMP_COMMUNITY=public
+      - PYTHONUNBUFFERED=1
     networks:
       - netsentry
     depends_on:
@@ -107,7 +110,9 @@ services:
 
   # Frontend
   frontend:
-    image: renew78/netsentry-frontend:latest
+    build:
+      context: https://github.com/renew78/ansible.git#claude/network-traffic-logger-NeLSQ
+      dockerfile: network-traffic-logger-docker/frontend/Dockerfile
     container_name: netsentry_frontend
     restart: unless-stopped
     networks:
