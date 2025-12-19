@@ -103,16 +103,29 @@ export default function AdGuard() {
         axios.get(`${API_URL}/adguard/queries`),
       ]);
 
-      setStats(statsRes.data);
-      setQueries(queriesRes.data);
+      setStats(statsRes.data || {
+        total_queries: 0,
+        blocked_queries: 0,
+        allowed_queries: 0,
+        blocking_percentage: 0,
+      });
+      setQueries(queriesRes.data || []);
 
       // Prepare pie chart data
+      const statsData = statsRes.data || {};
       setPieData([
-        { name: 'Erlaubt', value: statsRes.data.allowed_queries, color: '#00ff88' },
-        { name: 'Blockiert', value: statsRes.data.blocked_queries, color: '#ff4444' },
+        { name: 'Erlaubt', value: statsData.allowed_queries || 0, color: '#00ff88' },
+        { name: 'Blockiert', value: statsData.blocked_queries || 0, color: '#ff4444' },
       ]);
     } catch (error) {
       console.error('Error fetching AdGuard data:', error);
+      setStats({
+        total_queries: 0,
+        blocked_queries: 0,
+        allowed_queries: 0,
+        blocking_percentage: 0,
+      });
+      setQueries([]);
     } finally {
       setLoading(false);
     }

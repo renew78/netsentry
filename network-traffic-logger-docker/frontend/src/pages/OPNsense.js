@@ -105,11 +105,24 @@ export default function OPNsense() {
         axios.get(`${API_URL}/opnsense/traffic`),
       ]);
 
-      setStats(statsRes.data);
-      setFirewallLogs(logsRes.data);
-      setTrafficData(trafficRes.data);
+      setStats(statsRes.data || {
+        total_rules: 0,
+        blocked_connections: 0,
+        allowed_connections: 0,
+        active_connections: 0,
+      });
+      setFirewallLogs(logsRes.data || []);
+      setTrafficData(trafficRes.data || []);
     } catch (error) {
       console.error('Error fetching OPNsense data:', error);
+      setStats({
+        total_rules: 0,
+        blocked_connections: 0,
+        allowed_connections: 0,
+        active_connections: 0,
+      });
+      setFirewallLogs([]);
+      setTrafficData([]);
     } finally {
       setLoading(false);
     }
