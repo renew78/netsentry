@@ -10,10 +10,6 @@ import {
   MenuItem,
   LinearProgress,
 } from '@mui/material';
-import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
-import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
-import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
-import { de } from 'date-fns/locale';
 import {
   BarChart,
   Bar,
@@ -29,7 +25,7 @@ import {
 import { Search as SearchIcon } from '@mui/icons-material';
 import axios from 'axios';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+const API_URL = process.env.REACT_APP_BACKEND_URL || '/api';
 
 const intervals = [
   { value: '1m', label: '1 Minute' },
@@ -41,19 +37,36 @@ const intervals = [
 ];
 
 export default function History() {
-  const [startDate, setStartDate] = useState(new Date(Date.now() - 24 * 60 * 60 * 1000));
-  const [endDate, setEndDate] = useState(new Date());
   const [interval, setInterval] = useState('5m');
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [timeRange, setTimeRange] = useState('1h');
 
-  const fetchHistory = async () => {
+  const fetchHistory = async (range) => {
     setLoading(true);
+    setTimeRange(range);
     try {
-      const response = await axios.get(`${API_URL}/api/traffic/history`, {
+      const now = new Date();
+      let startDate;
+
+      switch (range) {
+        case '1h':
+          startDate = new Date(now.getTime() - 60 * 60 * 1000);
+          break;
+        case '24h':
+          startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+          break;
+        case '7d':
+          startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          break;
+        default:
+          startDate = new Date(now.getTime() - 60 * 60 * 1000);
+      }
+
+      const response = await axios.get(`${API_URL}/traffic/history`, {
         params: {
           start: startDate.toISOString(),
-          end: endDate.toISOString(),
+          end: now.toISOString(),
           interval: interval
         }
       });
@@ -98,64 +111,45 @@ export default function History() {
           <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
             Zeitraum auswählen
           </Typography>
-          <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={de}>
-            <Grid container spacing={2} alignItems="center">
-              <Grid item xs={12} md={3}>
-                <TextField
-                  select
-                  fullWidth
-                  label="Intervall"
-                  value={interval}
-                  onChange={(e) => setInterval(e.target.value)}
-                >
-                  {intervals.map((option) => (
-                    <MenuItem key={option.value} value={option.value}>
-                      {option.label}
-                    </MenuItem>
-                  ))}
-                </TextField>
-              </Grid>
-              <Grid item xs={12} md={9}>
-                <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-                  <Button
-                    variant="outlined"
-                    onClick={() => {
-                      setStartDate(new Date(Date.now() - 60 * 60 * 1000));
-                      setEndDate(new Date());
-                    }}
-                  >
-                    Letzte Stunde
-                  </Button>
-                  <Button
-                    variant="outlined"
-                    onClick={() => {
-                      setStartDate(new Date(Date.now() - 24 * 60 * 60 * 1000));
-                      setEndDate(new Date());
-                    }}
-                  >
-                    Letzte 24h
-                  </Button>
-                  <Button
-                    variant="outlined"
-                    onClick={() => {
-                      setStartDate(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000));
-                      setEndDate(new Date());
-                    }}
-                  >
-                    Letzte 7 Tage
-                  </Button>
-                  <Button
-                    variant="contained"
-                    startIcon={<SearchIcon />}
-                    onClick={fetchHistory}
-                    disabled={loading}
-                  >
-                    Abfragen
-                  </Button>
-                </Box>
-              </Grid>
+          <Grid container spacing={2} alignItems="center">
+            <Grid item xs={12} md={3}>
+              <TextField
+                select
+                fullWidth
+                label="Intervall"
+                value={interval}
+                onChange={(e) => setInterval(e.target.value)}
+              >
+                {intervals.map((option) => (
+                  <MenuItem key={option.value} value={option.value}>
+                    {option.label}
+                  </MenuItem>
+                ))}
+              </TextField>
             </Grid>
-          </LocalizationProvider>
+            <Grid item xs={12} md={9}>
+              <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                <Button
+                  variant={timeRange === '1h' ? 'contained' : 'outlined'}
+                  onClick={() => fetchHistory('1h')}
+                >
+                  Letzte Stunde
+                </Button>
+                <Button
+                  variant={timeRange === '24h' ? 'contained' : 'outlined'}
+                  onClick={() => fetchHistory('24h')}
+                >
+                  Letzte 24h
+                </Button>
+                <Button
+                  variant={timeRange === '7d' ? 'contained' : 'outlined'}
+                  onClick={() => fetchHistory('7d')}
+                >
+                  Letzte 7 Tage
+                </Button>
+              </Box>
+            </Grid>
+          </Grid>
         </CardContent>
       </Card>
 
@@ -243,7 +237,7 @@ export default function History() {
                 Keine Daten verfügbar
               </Typography>
               <Typography variant="body2" color="text.disabled">
-                Wählen Sie einen Zeitraum und klicken Sie auf "Abfragen"
+                Wählen Sie einen Zeitraum aus
               </Typography>
             </Box>
           </CardContent>

@@ -20,6 +20,9 @@ import {
   Router as RouterIcon,
   History as HistoryIcon,
   WifiTethering as WifiTetheringIcon,
+  Dns as DnsIcon,
+  Security as SecurityIcon,
+  Settings as SettingsIcon,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 
@@ -29,7 +32,10 @@ const menuItems = [
   { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
   { text: 'Geräte', icon: <DevicesIcon />, path: '/devices' },
   { text: 'Switches', icon: <RouterIcon />, path: '/switches' },
+  { text: 'AdGuard', icon: <DnsIcon />, path: '/adguard' },
+  { text: 'OPNsense', icon: <SecurityIcon />, path: '/opnsense' },
   { text: 'Verlauf', icon: <HistoryIcon />, path: '/history' },
+  { text: 'Einstellungen', icon: <SettingsIcon />, path: '/settings' },
 ];
 
 export default function Layout({ children }) {

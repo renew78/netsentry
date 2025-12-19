@@ -5,87 +5,143 @@ import {
   CardContent,
   Typography,
   Grid,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
   Chip,
   IconButton,
-  Button,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  TextField,
   LinearProgress,
   Tooltip,
   Alert,
 } from '@mui/material';
 import {
   Router as RouterIcon,
-  Edit as EditIcon,
-  Add as AddIcon,
-  Delete as DeleteIcon,
+  Refresh as RefreshIcon,
   CheckCircle as CheckCircleIcon,
   Cancel as CancelIcon,
-  Refresh as RefreshIcon,
+  Settings as SettingsIcon,
 } from '@mui/icons-material';
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+const API_URL = process.env.REACT_APP_BACKEND_URL || '/api';
 
 const formatBytes = (bytes) => {
   if (!bytes || bytes === 0) return '0 B';
   const k = 1024;
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
 };
 
 const getStatusColor = (status) => {
   switch (status) {
     case 'up':
-      return 'success';
+      return '#00ff88';
     case 'down':
-      return 'error';
+      return '#ff4444';
     default:
-      return 'default';
+      return '#666';
   }
 };
 
-const getStatusText = (status) => {
-  switch (status) {
-    case 'up':
-      return 'Online';
-    case 'down':
-      return 'Offline';
-    default:
-      return 'Unbekannt';
-  }
+const PortCard = ({ port }) => {
+  const isUp = port.status === 'up';
+
+  return (
+    <Card
+      sx={{
+        position: 'relative',
+        overflow: 'hidden',
+        '&::before': {
+          content: '""',
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '4px',
+          height: '100%',
+          backgroundColor: getStatusColor(port.status),
+        },
+      }}
+    >
+      <CardContent sx={{ py: 1.5, px: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Chip
+              label={`P${port.port_number}`}
+              size="small"
+              sx={{
+                fontWeight: 700,
+                minWidth: 45,
+                backgroundColor: isUp ? 'rgba(0, 255, 136, 0.1)' : 'rgba(255, 68, 68, 0.1)',
+                color: isUp ? '#00ff88' : '#ff4444',
+              }}
+            />
+            {isUp ? (
+              <CheckCircleIcon sx={{ fontSize: 16, color: '#00ff88' }} />
+            ) : (
+              <CancelIcon sx={{ fontSize: 16, color: '#ff4444' }} />
+            )}
+          </Box>
+          {port.vlan_id && (
+            <Chip
+              label={`VLAN ${port.vlan_id}`}
+              size="small"
+              sx={{ fontSize: '0.7rem', height: 20 }}
+              color="info"
+              variant="outlined"
+            />
+          )}
+        </Box>
+
+        <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5, fontSize: '0.85rem' }}>
+          {port.port_name || `Port ${port.port_number}`}
+        </Typography>
+
+        {port.description && (
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{
+              display: 'block',
+              mb: 1,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {port.description}
+          </Typography>
+        )}
+
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 1 }}>
+          <Box>
+            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
+              ↓ {formatBytes(port.bytes_in)}
+            </Typography>
+          </Box>
+          <Box>
+            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
+              ↑ {formatBytes(port.bytes_out)}
+            </Typography>
+          </Box>
+          {port.speed && (
+            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
+              {port.speed}
+            </Typography>
+          )}
+        </Box>
+      </CardContent>
+    </Card>
+  );
 };
 
 export default function Switches() {
   const [ports, setPorts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [addDialogOpen, setAddDialogOpen] = useState(false);
-  const [selectedPort, setSelectedPort] = useState(null);
-  const [formData, setFormData] = useState({
-    switch_ip: '',
-    switch_name: '',
-    port_number: '',
-    port_name: '',
-    vlan_id: '',
-    description: '',
-    is_enabled: true
-  });
+  const navigate = useNavigate();
 
   const fetchPorts = async () => {
     setLoading(true);
     try {
-      const response = await axios.get(`${API_URL}/api/switches/ports`);
+      const response = await axios.get(`${API_URL}/switches/ports`);
       setPorts(response.data);
     } catch (error) {
       console.error('Error fetching switch ports:', error);
@@ -100,80 +156,6 @@ export default function Switches() {
     return () => clearInterval(interval);
   }, []);
 
-  const handleEditClick = (port) => {
-    setSelectedPort(port);
-    setFormData({
-      switch_ip: port.switch_ip,
-      switch_name: port.switch_name,
-      port_number: port.port_number,
-      port_name: port.port_name || '',
-      vlan_id: port.vlan_id || '',
-      description: port.description || '',
-      is_enabled: port.is_enabled
-    });
-    setEditDialogOpen(true);
-  };
-
-  const handleAddClick = () => {
-    setFormData({
-      switch_ip: '',
-      switch_name: '',
-      port_number: '',
-      port_name: '',
-      vlan_id: '',
-      description: '',
-      is_enabled: true
-    });
-    setAddDialogOpen(true);
-  };
-
-  const handleSaveEdit = async () => {
-    try {
-      await axios.put(`${API_URL}/api/switches/ports/${selectedPort.id}`, {
-        port_name: formData.port_name,
-        vlan_id: parseInt(formData.vlan_id) || null,
-        description: formData.description,
-        is_enabled: formData.is_enabled
-      });
-      setEditDialogOpen(false);
-      fetchPorts();
-    } catch (error) {
-      console.error('Error updating port:', error);
-      alert('Fehler beim Aktualisieren des Ports');
-    }
-  };
-
-  const handleAddPort = async () => {
-    try {
-      await axios.post(`${API_URL}/api/switches/ports`, {
-        switch_ip: formData.switch_ip,
-        switch_name: formData.switch_name,
-        port_number: parseInt(formData.port_number),
-        port_name: formData.port_name,
-        vlan_id: parseInt(formData.vlan_id) || null,
-        description: formData.description,
-        is_enabled: formData.is_enabled
-      });
-      setAddDialogOpen(false);
-      fetchPorts();
-    } catch (error) {
-      console.error('Error adding port:', error);
-      alert('Fehler beim Hinzufügen des Ports');
-    }
-  };
-
-  const handleDeletePort = async (portId) => {
-    if (window.confirm('Möchten Sie diesen Port wirklich löschen?')) {
-      try {
-        await axios.delete(`${API_URL}/api/switches/ports/${portId}`);
-        fetchPorts();
-      } catch (error) {
-        console.error('Error deleting port:', error);
-        alert('Fehler beim Löschen des Ports');
-      }
-    }
-  };
-
   // Group ports by switch
   const groupedPorts = ports.reduce((acc, port) => {
     if (!acc[port.switch_ip]) {
@@ -187,25 +169,30 @@ export default function Switches() {
     return acc;
   }, {});
 
+  const getTotalStats = (ports) => {
+    const activeCount = ports.filter(p => p.status === 'up').length;
+    const totalIn = ports.reduce((sum, p) => sum + (p.bytes_in || 0), 0);
+    const totalOut = ports.reduce((sum, p) => sum + (p.bytes_out || 0), 0);
+    return { activeCount, totalIn, totalOut };
+  };
+
   return (
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Typography variant="h4" sx={{ fontWeight: 700 }}>
           Switch-Verwaltung
         </Typography>
-        <Box>
+        <Box sx={{ display: 'flex', gap: 1 }}>
           <Tooltip title="Aktualisieren">
-            <IconButton onClick={fetchPorts} color="primary" sx={{ mr: 1 }}>
+            <IconButton onClick={fetchPorts} color="primary">
               <RefreshIcon />
             </IconButton>
           </Tooltip>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={handleAddClick}
-          >
-            Port hinzufügen
-          </Button>
+          <Tooltip title="Switches konfigurieren">
+            <IconButton onClick={() => navigate('/settings')} color="primary">
+              <SettingsIcon />
+            </IconButton>
+          </Tooltip>
         </Box>
       </Box>
 
@@ -220,247 +207,101 @@ export default function Switches() {
                 Keine Switches konfiguriert
               </Typography>
               <Typography variant="body2" color="text.disabled" sx={{ mb: 3 }}>
-                Fügen Sie Ihre TP-Link Switches hinzu, um die Port-Überwachung zu aktivieren
+                Konfigurieren Sie Ihre Switches in den Einstellungen mit Web-Scraping Login-Daten
               </Typography>
-              <Button
-                variant="contained"
-                startIcon={<AddIcon />}
-                onClick={handleAddClick}
+              <IconButton
+                onClick={() => navigate('/settings')}
+                sx={{
+                  backgroundColor: 'primary.main',
+                  color: 'white',
+                  '&:hover': { backgroundColor: 'primary.dark' },
+                  width: 64,
+                  height: 64,
+                }}
               >
-                Ersten Port hinzufügen
-              </Button>
+                <SettingsIcon sx={{ fontSize: 32 }} />
+              </IconButton>
             </Box>
           </CardContent>
         </Card>
       ) : (
-        <Grid container spacing={3}>
-          {Object.values(groupedPorts).map((switchData) => (
-            <Grid item xs={12} key={switchData.switch_ip}>
-              <Card>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+          {Object.values(groupedPorts).map((switchData) => {
+            const stats = getTotalStats(switchData.ports);
+            return (
+              <Card key={switchData.switch_ip}>
                 <CardContent>
-                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                    <RouterIcon sx={{ fontSize: 32, color: 'primary.main', mr: 2 }} />
-                    <Box>
-                      <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                        {switchData.switch_name}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        {switchData.switch_ip}
-                      </Typography>
+                  {/* Switch Header */}
+                  <Box sx={{ mb: 3 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                      <RouterIcon sx={{ fontSize: 32, color: 'primary.main', mr: 2 }} />
+                      <Box sx={{ flex: 1 }}>
+                        <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                          {switchData.switch_name}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          {switchData.switch_ip}
+                        </Typography>
+                      </Box>
+                      <Box sx={{ display: 'flex', gap: 2 }}>
+                        <Box sx={{ textAlign: 'center' }}>
+                          <Typography variant="caption" color="text.secondary">
+                            Aktive Ports
+                          </Typography>
+                          <Typography variant="h6" color="success.main">
+                            {stats.activeCount}/{switchData.ports.length}
+                          </Typography>
+                        </Box>
+                        <Box sx={{ textAlign: 'center' }}>
+                          <Typography variant="caption" color="text.secondary">
+                            Traffic ↓
+                          </Typography>
+                          <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
+                            {formatBytes(stats.totalIn)}
+                          </Typography>
+                        </Box>
+                        <Box sx={{ textAlign: 'center' }}>
+                          <Typography variant="caption" color="text.secondary">
+                            Traffic ↑
+                          </Typography>
+                          <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
+                            {formatBytes(stats.totalOut)}
+                          </Typography>
+                        </Box>
+                      </Box>
                     </Box>
-                    <Chip
-                      label={`${switchData.ports.length} Ports`}
-                      sx={{ ml: 'auto' }}
-                      color="primary"
-                      variant="outlined"
-                    />
                   </Box>
 
-                  <TableContainer>
-                    <Table size="small">
-                      <TableHead>
-                        <TableRow>
-                          <TableCell>Port</TableCell>
-                          <TableCell>Name</TableCell>
-                          <TableCell>VLAN</TableCell>
-                          <TableCell>Status</TableCell>
-                          <TableCell>Geschwindigkeit</TableCell>
-                          <TableCell align="right">Eingehend</TableCell>
-                          <TableCell align="right">Ausgehend</TableCell>
-                          <TableCell>Beschreibung</TableCell>
-                          <TableCell align="center">Aktionen</TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {switchData.ports.sort((a, b) => a.port_number - b.port_number).map((port) => (
-                          <TableRow key={port.id} hover>
-                            <TableCell>
-                              <Chip
-                                label={port.port_number}
-                                size="small"
-                                sx={{ fontWeight: 600, minWidth: 50 }}
-                              />
-                            </TableCell>
-                            <TableCell>
-                              <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                {port.port_name || '-'}
-                              </Typography>
-                            </TableCell>
-                            <TableCell>
-                              {port.vlan_id ? (
-                                <Chip
-                                  label={`VLAN ${port.vlan_id}`}
-                                  size="small"
-                                  color="info"
-                                  variant="outlined"
-                                />
-                              ) : (
-                                <Typography variant="body2" color="text.disabled">-</Typography>
-                              )}
-                            </TableCell>
-                            <TableCell>
-                              <Chip
-                                icon={port.status === 'up' ? <CheckCircleIcon /> : <CancelIcon />}
-                                label={getStatusText(port.status)}
-                                size="small"
-                                color={getStatusColor(port.status)}
-                              />
-                            </TableCell>
-                            <TableCell>
-                              <Typography variant="body2">
-                                {port.speed || '-'}
-                              </Typography>
-                            </TableCell>
-                            <TableCell align="right">
-                              <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
-                                {formatBytes(port.bytes_in)}
-                              </Typography>
-                            </TableCell>
-                            <TableCell align="right">
-                              <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
-                                {formatBytes(port.bytes_out)}
-                              </Typography>
-                            </TableCell>
-                            <TableCell>
-                              <Typography
-                                variant="body2"
-                                color="text.secondary"
-                                sx={{
-                                  maxWidth: 200,
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
-                                  whiteSpace: 'nowrap'
-                                }}
-                              >
-                                {port.description || '-'}
-                              </Typography>
-                            </TableCell>
-                            <TableCell align="center">
-                              <Tooltip title="Bearbeiten">
-                                <IconButton
-                                  size="small"
-                                  onClick={() => handleEditClick(port)}
-                                  color="primary"
-                                >
-                                  <EditIcon fontSize="small" />
-                                </IconButton>
-                              </Tooltip>
-                              <Tooltip title="Löschen">
-                                <IconButton
-                                  size="small"
-                                  onClick={() => handleDeletePort(port.id)}
-                                  color="error"
-                                >
-                                  <DeleteIcon fontSize="small" />
-                                </IconButton>
-                              </Tooltip>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </TableContainer>
+                  {/* Port Grid - Compact View */}
+                  <Grid container spacing={1.5}>
+                    {switchData.ports
+                      .sort((a, b) => a.port_number - b.port_number)
+                      .map((port) => (
+                        <Grid item xs={6} sm={4} md={3} lg={2} key={port.id}>
+                          <PortCard port={port} />
+                        </Grid>
+                      ))}
+                  </Grid>
                 </CardContent>
               </Card>
-            </Grid>
-          ))}
-        </Grid>
+            );
+          })}
+        </Box>
       )}
 
-      {/* Edit Dialog */}
-      <Dialog open={editDialogOpen} onClose={() => setEditDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Port bearbeiten</DialogTitle>
-        <DialogContent>
-          <Box sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <TextField
-              label="Port-Name"
-              value={formData.port_name}
-              onChange={(e) => setFormData({ ...formData, port_name: e.target.value })}
-              fullWidth
-            />
-            <TextField
-              label="VLAN ID"
-              type="number"
-              value={formData.vlan_id}
-              onChange={(e) => setFormData({ ...formData, vlan_id: e.target.value })}
-              fullWidth
-              helperText="Optional: VLAN-ID für diesen Port"
-            />
-            <TextField
-              label="Beschreibung"
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              fullWidth
-              multiline
-              rows={3}
-              helperText="Was ist an diesem Port angeschlossen?"
-            />
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setEditDialogOpen(false)}>Abbrechen</Button>
-          <Button onClick={handleSaveEdit} variant="contained">Speichern</Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Add Dialog */}
-      <Dialog open={addDialogOpen} onClose={() => setAddDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Port hinzufügen</DialogTitle>
-        <DialogContent>
-          <Box sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <Alert severity="info">
-              Stellen Sie sicher, dass der Switch via SNMP erreichbar ist und die Community richtig konfiguriert ist.
-            </Alert>
-            <TextField
-              label="Switch IP-Adresse"
-              value={formData.switch_ip}
-              onChange={(e) => setFormData({ ...formData, switch_ip: e.target.value })}
-              fullWidth
-              required
-            />
-            <TextField
-              label="Switch Name"
-              value={formData.switch_name}
-              onChange={(e) => setFormData({ ...formData, switch_name: e.target.value })}
-              fullWidth
-              required
-            />
-            <TextField
-              label="Port-Nummer"
-              type="number"
-              value={formData.port_number}
-              onChange={(e) => setFormData({ ...formData, port_number: e.target.value })}
-              fullWidth
-              required
-            />
-            <TextField
-              label="Port-Name"
-              value={formData.port_name}
-              onChange={(e) => setFormData({ ...formData, port_name: e.target.value })}
-              fullWidth
-            />
-            <TextField
-              label="VLAN ID"
-              type="number"
-              value={formData.vlan_id}
-              onChange={(e) => setFormData({ ...formData, vlan_id: e.target.value })}
-              fullWidth
-            />
-            <TextField
-              label="Beschreibung"
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              fullWidth
-              multiline
-              rows={3}
-            />
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setAddDialogOpen(false)}>Abbrechen</Button>
-          <Button onClick={handleAddPort} variant="contained">Hinzufügen</Button>
-        </DialogActions>
-      </Dialog>
+      <Alert severity="info" sx={{ mt: 3 }}>
+        <Typography variant="body2">
+          <strong>Hinweis:</strong> Die Switch-Zugangsdaten können in den{' '}
+          <span
+            onClick={() => navigate('/settings')}
+            style={{ cursor: 'pointer', textDecoration: 'underline', fontWeight: 600 }}
+          >
+            Einstellungen
+          </span>{' '}
+          konfiguriert werden. Da Ihre Switches kein SNMP unterstützen, werden die Daten via
+          Web-Scraping abgerufen.
+        </Typography>
+      </Alert>
     </Box>
   );
 }

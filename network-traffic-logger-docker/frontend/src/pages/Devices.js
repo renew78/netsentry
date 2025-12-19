@@ -27,7 +27,7 @@ import {
 } from '@mui/icons-material';
 import axios from 'axios';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+const API_URL = process.env.REACT_APP_BACKEND_URL || '/api';
 
 const formatBytes = (bytes) => {
   if (bytes === 0) return '0 B';
@@ -60,11 +60,12 @@ export default function Devices() {
   const [filteredDevices, setFilteredDevices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [vlans, setVlans] = useState({});
 
   const fetchDevices = async () => {
     setLoading(true);
     try {
-      const response = await axios.get(`${API_URL}/api/devices`);
+      const response = await axios.get(`${API_URL}/devices`);
       setDevices(response.data);
       setFilteredDevices(response.data);
     } catch (error) {
@@ -74,8 +75,25 @@ export default function Devices() {
     }
   };
 
+  const fetchVlans = async () => {
+    try {
+      const response = await axios.get(`${API_URL}/settings`);
+      // Convert VLAN array to ID->Name mapping
+      const vlanMap = {};
+      if (response.data.vlans) {
+        response.data.vlans.forEach((vlan) => {
+          vlanMap[vlan.id] = vlan.name;
+        });
+      }
+      setVlans(vlanMap);
+    } catch (error) {
+      console.error('Error fetching VLANs:', error);
+    }
+  };
+
   useEffect(() => {
     fetchDevices();
+    fetchVlans();
     const interval = setInterval(fetchDevices, 10000); // Refresh every 10 seconds
     return () => clearInterval(interval);
   }, []);
@@ -114,6 +132,11 @@ export default function Devices() {
     if (diffHours < 24) return `Vor ${diffHours} Std.`;
     const diffDays = Math.floor(diffHours / 24);
     return `Vor ${diffDays} Tag(en)`;
+  };
+
+  const getVlanName = (vlanId) => {
+    if (!vlanId) return null;
+    return vlans[vlanId] || `VLAN ${vlanId}`;
   };
 
   return (
@@ -158,6 +181,7 @@ export default function Devices() {
                 <TableCell>IP-Adresse</TableCell>
                 <TableCell>Hostname</TableCell>
                 <TableCell>MAC-Adresse</TableCell>
+                <TableCell>VLAN</TableCell>
                 <TableCell>Datenfluss</TableCell>
                 <TableCell align="right">Gesendet</TableCell>
                 <TableCell align="right">Empfangen</TableCell>
@@ -167,7 +191,7 @@ export default function Devices() {
             <TableBody>
               {filteredDevices.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} align="center">
+                  <TableCell colSpan={9} align="center">
                     <Box sx={{ py: 4 }}>
                       <ComputerIcon sx={{ fontSize: 64, color: 'text.disabled', mb: 2 }} />
                       <Typography variant="h6" color="text.secondary">
@@ -182,6 +206,7 @@ export default function Devices() {
               ) : (
                 filteredDevices.map((device) => {
                   const direction = getDirectionText(device.bytes_sent, device.bytes_received);
+                  const vlanName = getVlanName(device.vlan_id);
                   return (
                     <TableRow
                       key={device.id}
@@ -207,6 +232,18 @@ export default function Devices() {
                         <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>
                           {device.mac_address || '-'}
                         </Typography>
+                      </TableCell>
+                      <TableCell>
+                        {vlanName ? (
+                          <Chip
+                            label={vlanName}
+                            size="small"
+                            color="info"
+                            variant="outlined"
+                          />
+                        ) : (
+                          <Typography variant="body2" color="text.disabled">-</Typography>
+                        )}
                       </TableCell>
                       <TableCell>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
