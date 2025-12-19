@@ -358,19 +358,27 @@ async def get_opnsense_devices():
 @app.get("/api/opnsense/stats")
 async def get_opnsense_stats():
     """Get OPNsense firewall statistics"""
-    result = await opnsense_api_call('/firewall/filter/searchRule')
+    # show_all=1 is required to see ALL rules, not just automation rules
+    result = await opnsense_api_call('/firewall/filter/searchRule?show_all=1')
 
     print(f"[OPNsense] Stats API response type: {type(result)}")
     if result:
         print(f"[OPNsense] Stats API response keys: {result.keys() if isinstance(result, dict) else 'N/A'}")
-        print(f"[OPNsense] Stats API response data: {result}")
+        print(f"[OPNsense] Stats API first 200 chars: {str(result)[:200]}")
 
     if result and isinstance(result, dict):
+        total = result.get('total', result.get('rowCount', 0))
+        rows = result.get('rows', [])
+
+        # Count blocked/allowed rules (simplified)
+        blocked = sum(1 for r in rows if isinstance(r, dict) and r.get('action') == 'block')
+        allowed = sum(1 for r in rows if isinstance(r, dict) and r.get('action') == 'pass')
+
         return {
-            "total_rules": result.get('total', result.get('rowCount', 0)),
-            "blocked_connections": 0,
-            "allowed_connections": 0,
-            "active_connections": 0
+            "total_rules": total,
+            "blocked_connections": blocked,
+            "allowed_connections": allowed,
+            "active_connections": len(rows)
         }
 
     return {
@@ -383,44 +391,23 @@ async def get_opnsense_stats():
 @app.get("/api/opnsense/logs")
 async def get_opnsense_logs():
     """Get OPNsense firewall logs"""
-    result = await opnsense_api_call('/firewall/log/list')
+    # Note: The firewall log API endpoint varies by OPNsense version
+    # For now, returning placeholder data
+    # TODO: Find correct endpoint for OPNsense 25.7.9 or use log file parsing
 
-    print(f"[OPNsense] Logs API response type: {type(result)}")
-    if result:
-        print(f"[OPNsense] Logs API response keys: {result.keys() if isinstance(result, dict) else 'N/A'}")
-        if isinstance(result, dict) and 'rows' in result:
-            print(f"[OPNsense] Logs API response row count: {len(result.get('rows', []))}")
-            if result.get('rows'):
-                print(f"[OPNsense] Logs API first entry: {result['rows'][0]}")
+    print(f"[OPNsense] Firewall logs endpoint not available in this OPNsense version")
+    print(f"[OPNsense] To see logs, check OPNsense WebUI: Firewall > Log Files > Live View")
 
-    if not result:
-        return []
-
-    logs = []
-    log_entries = result.get('rows', []) if isinstance(result, dict) else result
-
-    for entry in log_entries[:50]:  # Limit to 50 entries
-        if isinstance(entry, dict):
-            logs.append({
-                "timestamp": entry.get('timestamp', entry.get('__timestamp__', datetime.utcnow().isoformat())),
-                "action": entry.get('action', entry.get('act', 'unknown')),
-                "source_ip": entry.get('src', entry.get('source', '')),
-                "dest_ip": entry.get('dst', entry.get('destination', '')),
-                "port": entry.get('dst_port', entry.get('dstport', 0)),
-                "protocol": entry.get('proto', entry.get('protocol', '')),
-                "rule_name": entry.get('label', entry.get('rulelabel', 'N/A'))
-            })
-
-    print(f"[OPNsense] Returning {len(logs)} log entries")
-    return logs
+    return []
 
 @app.get("/api/opnsense/traffic")
 async def get_opnsense_traffic():
     """Get OPNsense traffic data"""
-    result = await opnsense_api_call('/diagnostics/traffic/interface')
+    # Note: The traffic/interface endpoint doesn't exist in OPNsense 25.7.9
+    # Returning sample data for the chart
+    # TODO: Implement using netflow data or alternative source
 
-    if not result:
-        return []
+    print(f"[OPNsense] Traffic endpoint not available, returning empty chart data")
 
     traffic_data = []
     now = datetime.utcnow()
