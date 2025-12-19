@@ -360,9 +360,14 @@ async def get_opnsense_stats():
     """Get OPNsense firewall statistics"""
     result = await opnsense_api_call('/firewall/filter/searchRule')
 
+    print(f"[OPNsense] Stats API response type: {type(result)}")
+    if result:
+        print(f"[OPNsense] Stats API response keys: {result.keys() if isinstance(result, dict) else 'N/A'}")
+        print(f"[OPNsense] Stats API response data: {result}")
+
     if result and isinstance(result, dict):
         return {
-            "total_rules": result.get('total', 0),
+            "total_rules": result.get('total', result.get('rowCount', 0)),
             "blocked_connections": 0,
             "allowed_connections": 0,
             "active_connections": 0
@@ -380,6 +385,14 @@ async def get_opnsense_logs():
     """Get OPNsense firewall logs"""
     result = await opnsense_api_call('/firewall/log/list')
 
+    print(f"[OPNsense] Logs API response type: {type(result)}")
+    if result:
+        print(f"[OPNsense] Logs API response keys: {result.keys() if isinstance(result, dict) else 'N/A'}")
+        if isinstance(result, dict) and 'rows' in result:
+            print(f"[OPNsense] Logs API response row count: {len(result.get('rows', []))}")
+            if result.get('rows'):
+                print(f"[OPNsense] Logs API first entry: {result['rows'][0]}")
+
     if not result:
         return []
 
@@ -389,15 +402,16 @@ async def get_opnsense_logs():
     for entry in log_entries[:50]:  # Limit to 50 entries
         if isinstance(entry, dict):
             logs.append({
-                "timestamp": entry.get('timestamp', datetime.utcnow().isoformat()),
-                "action": entry.get('action', 'unknown'),
-                "source_ip": entry.get('src', ''),
-                "dest_ip": entry.get('dst', ''),
-                "port": entry.get('dst_port', 0),
-                "protocol": entry.get('proto', ''),
-                "rule_name": entry.get('label', 'N/A')
+                "timestamp": entry.get('timestamp', entry.get('__timestamp__', datetime.utcnow().isoformat())),
+                "action": entry.get('action', entry.get('act', 'unknown')),
+                "source_ip": entry.get('src', entry.get('source', '')),
+                "dest_ip": entry.get('dst', entry.get('destination', '')),
+                "port": entry.get('dst_port', entry.get('dstport', 0)),
+                "protocol": entry.get('proto', entry.get('protocol', '')),
+                "rule_name": entry.get('label', entry.get('rulelabel', 'N/A'))
             })
 
+    print(f"[OPNsense] Returning {len(logs)} log entries")
     return logs
 
 @app.get("/api/opnsense/traffic")
