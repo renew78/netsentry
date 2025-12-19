@@ -185,7 +185,7 @@ configs:
               # Fix for double /api/api/ requests from frontend
               location ~ ^/api/api/(.*)$$ {
                   rewrite ^/api/api/(.*)$$ /api/$$1 break;
-                  proxy_pass http://backend:8000;
+                  proxy_pass http://backend;
                   proxy_http_version 1.1;
                   proxy_set_header Host $$host;
                   proxy_set_header X-Real-IP $$remote_addr;
