@@ -131,7 +131,7 @@ async def lifespan(app: FastAPI):
     
     # Initialize default settings if not exists
     if not await db.settings.find_one():
-        await db.settings.insert_one(Settings().dict())
+        await db.settings.insert_one(Settings().model_dump())
     
     yield
     
@@ -167,7 +167,7 @@ async def get_settings():
     """Get application settings"""
     settings = await db.settings.find_one()
     if not settings:
-        settings = Settings().dict()
+        settings = Settings().model_dump()
     settings.pop('_id', None)
     return settings
 
@@ -175,7 +175,7 @@ async def get_settings():
 async def save_settings(settings: Settings):
     """Save application settings"""
     await db.settings.delete_many({})
-    await db.settings.insert_one(settings.dict())
+    await db.settings.insert_one(settings.model_dump())
     return {"message": "Settings saved successfully"}
 
 @app.get("/api/stats/current", response_model=TrafficStats)
