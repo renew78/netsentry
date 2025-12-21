@@ -43,11 +43,18 @@ class AdGuardConfig(BaseModel):
     url: Optional[str] = ''
     apiKey: Optional[str] = ''
 
+class OPNsenseFeatures(BaseModel):
+    showDevices: bool = True
+    showFirewallStats: bool = True
+    showFirewallLogs: bool = False
+    showTrafficChart: bool = False
+
 class OPNsenseConfig(BaseModel):
     enabled: bool = False
     url: Optional[str] = ''
     apiKey: Optional[str] = ''
     apiSecret: Optional[str] = ''
+    features: OPNsenseFeatures = OPNsenseFeatures()
 
 class TrueNASConfig(BaseModel):
     enabled: bool = False

@@ -55,7 +55,18 @@ export default function Settings() {
   const [settings, setSettings] = useState({
     vlans: [],
     adguard: { enabled: false, url: '', apiKey: '' },
-    opnsense: { enabled: false, url: '', apiKey: '', apiSecret: '' },
+    opnsense: {
+      enabled: false,
+      url: '',
+      apiKey: '',
+      apiSecret: '',
+      features: {
+        showDevices: true,
+        showFirewallStats: true,
+        showFirewallLogs: false,
+        showTrafficChart: false,
+      },
+    },
     truenas: { enabled: false, url: '', apiKey: '' },
     ai_analysis: { enabled: false },
   });
@@ -74,7 +85,18 @@ export default function Settings() {
       const defaultSettings = {
         vlans: [],
         adguard: { enabled: false, url: '', apiKey: '' },
-        opnsense: { enabled: false, url: '', apiKey: '', apiSecret: '' },
+        opnsense: {
+          enabled: false,
+          url: '',
+          apiKey: '',
+          apiSecret: '',
+          features: {
+            showDevices: true,
+            showFirewallStats: true,
+            showFirewallLogs: false,
+            showTrafficChart: false,
+          },
+        },
         truenas: { enabled: false, url: '', apiKey: '' },
         ai_analysis: { enabled: false },
       };
@@ -82,7 +104,14 @@ export default function Settings() {
         ...defaultSettings,
         ...response.data,
         adguard: { ...defaultSettings.adguard, ...(response.data.adguard || {}) },
-        opnsense: { ...defaultSettings.opnsense, ...(response.data.opnsense || {}) },
+        opnsense: {
+          ...defaultSettings.opnsense,
+          ...(response.data.opnsense || {}),
+          features: {
+            ...defaultSettings.opnsense.features,
+            ...((response.data.opnsense && response.data.opnsense.features) || {}),
+          },
+        },
         truenas: { ...defaultSettings.truenas, ...(response.data.truenas || {}) },
         ai_analysis: { ...defaultSettings.ai_analysis, ...(response.data.ai_analysis || {}) },
       };
@@ -359,6 +388,105 @@ export default function Settings() {
                   disabled={!settings.opnsense.enabled}
                 />
               </Grid>
+
+              {/* OPNsense Features */}
+              {settings.opnsense.enabled && (
+                <>
+                  <Grid item xs={12}>
+                    <Typography variant="subtitle1" sx={{ mt: 2, mb: 1, fontWeight: 600 }}>
+                      Anzuzeigende Komponenten
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          checked={settings.opnsense.features?.showDevices ?? true}
+                          onChange={(e) =>
+                            setSettings({
+                              ...settings,
+                              opnsense: {
+                                ...settings.opnsense,
+                                features: {
+                                  ...settings.opnsense.features,
+                                  showDevices: e.target.checked,
+                                },
+                              },
+                            })
+                          }
+                        />
+                      }
+                      label="Geräteliste anzeigen"
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          checked={settings.opnsense.features?.showFirewallStats ?? true}
+                          onChange={(e) =>
+                            setSettings({
+                              ...settings,
+                              opnsense: {
+                                ...settings.opnsense,
+                                features: {
+                                  ...settings.opnsense.features,
+                                  showFirewallStats: e.target.checked,
+                                },
+                              },
+                            })
+                          }
+                        />
+                      }
+                      label="Firewall-Statistiken anzeigen"
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          checked={settings.opnsense.features?.showFirewallLogs ?? false}
+                          onChange={(e) =>
+                            setSettings({
+                              ...settings,
+                              opnsense: {
+                                ...settings.opnsense,
+                                features: {
+                                  ...settings.opnsense.features,
+                                  showFirewallLogs: e.target.checked,
+                                },
+                              },
+                            })
+                          }
+                        />
+                      }
+                      label="Firewall-Logs anzeigen (experimentell)"
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          checked={settings.opnsense.features?.showTrafficChart ?? false}
+                          onChange={(e) =>
+                            setSettings({
+                              ...settings,
+                              opnsense: {
+                                ...settings.opnsense,
+                                features: {
+                                  ...settings.opnsense.features,
+                                  showTrafficChart: e.target.checked,
+                                },
+                              },
+                            })
+                          }
+                        />
+                      }
+                      label="Traffic-Diagramm anzeigen (experimentell)"
+                    />
+                  </Grid>
+                </>
+              )}
             </Grid>
           </TabPanel>
 
