@@ -409,25 +409,70 @@ async def get_opnsense_logs():
 
 @app.get("/api/opnsense/traffic")
 async def get_opnsense_traffic():
-    """Get OPNsense traffic data"""
-    # Note: The traffic/interface endpoint doesn't exist in OPNsense 25.7.9
-    # Returning sample data for the chart
-    # TODO: Implement using netflow data or alternative source
+    """Get network traffic data from InfluxDB"""
+    try:
+        query_api = app.state.influx.query_api()
 
-    print(f"[OPNsense] Traffic endpoint not available, returning empty chart data")
+        # Query traffic data for the last hour in 5-minute intervals
+        query = f'''
+        from(bucket: "traffic")
+            |> range(start: -1h)
+            |> filter(fn: (r) => r["_measurement"] == "network_traffic")
+            |> filter(fn: (r) => r["_field"] == "bytes")
+            |> aggregateWindow(every: 5m, fn: sum, createEmpty: true)
+            |> fill(value: 0)
+        '''
 
-    traffic_data = []
-    now = datetime.utcnow()
+        result = query_api.query(query=query, org="network-monitoring")
 
-    for i in range(12):  # 12 data points (1 hour at 5-minute intervals)
-        timestamp = (now - timedelta(minutes=i*5)).strftime("%H:%M")
-        traffic_data.insert(0, {
-            "time": timestamp,
-            "allowed": 0,
-            "blocked": 0
-        })
+        # Process results into time series data
+        traffic_by_time = {}
 
-    return traffic_data
+        for table in result:
+            for record in table.records:
+                time_str = record.get_time().strftime("%H:%M")
+                bytes_value = record.get_value() or 0
+
+                if time_str not in traffic_by_time:
+                    traffic_by_time[time_str] = {"time": time_str, "total": 0}
+
+                traffic_by_time[time_str]["total"] += bytes_value
+
+        # Convert to list and sort by time
+        traffic_data = list(traffic_by_time.values())
+        traffic_data.sort(key=lambda x: x["time"])
+
+        # Convert bytes to MB and format for chart
+        for item in traffic_data:
+            item["traffic_mb"] = round(item["total"] / (1024 * 1024), 2)
+            item.pop("total", None)
+
+        # If no data, generate empty data points for the last hour
+        if not traffic_data:
+            traffic_data = []
+            now = datetime.utcnow()
+            for i in range(12):  # 12 data points (1 hour at 5-minute intervals)
+                timestamp = (now - timedelta(minutes=i*5)).strftime("%H:%M")
+                traffic_data.insert(0, {
+                    "time": timestamp,
+                    "traffic_mb": 0
+                })
+
+        print(f"[OPNsense] Returning {len(traffic_data)} traffic data points from InfluxDB")
+        return traffic_data
+
+    except Exception as e:
+        print(f"[OPNsense] Error fetching traffic data from InfluxDB: {e}")
+        # Return empty data on error
+        traffic_data = []
+        now = datetime.utcnow()
+        for i in range(12):
+            timestamp = (now - timedelta(minutes=i*5)).strftime("%H:%M")
+            traffic_data.insert(0, {
+                "time": timestamp,
+                "traffic_mb": 0
+            })
+        return traffic_data
 
 @app.get("/api/opnsense/test")
 async def test_opnsense_connection():

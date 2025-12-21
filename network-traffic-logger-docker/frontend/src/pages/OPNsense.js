@@ -284,46 +284,35 @@ export default function OPNsense() {
         <Card sx={{ mb: 3 }}>
           <CardContent>
           <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
-            Firewall Traffic (Letzte Stunde)
+            Netzwerk-Traffic (Letzte Stunde)
           </Typography>
           <ResponsiveContainer width="100%" height={300}>
             <AreaChart data={trafficData}>
               <defs>
-                <linearGradient id="colorAllowed" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#00ff88" stopOpacity={0.8} />
-                  <stop offset="95%" stopColor="#00ff88" stopOpacity={0} />
-                </linearGradient>
-                <linearGradient id="colorBlocked" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#ff4444" stopOpacity={0.8} />
-                  <stop offset="95%" stopColor="#ff4444" stopOpacity={0} />
+                <linearGradient id="colorTraffic" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#00d4ff" stopOpacity={0.8} />
+                  <stop offset="95%" stopColor="#00d4ff" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#2a2a3e" />
               <XAxis dataKey="time" stroke="#a0a0a0" />
-              <YAxis stroke="#a0a0a0" />
+              <YAxis stroke="#a0a0a0" label={{ value: 'MB', angle: -90, position: 'insideLeft', style: { fill: '#a0a0a0' } }} />
               <RechartsTooltip
                 contentStyle={{
                   backgroundColor: '#1a1a2e',
                   border: '1px solid #2a2a3e',
                   borderRadius: 8,
                 }}
+                formatter={(value) => [`${value} MB`, 'Traffic']}
               />
               <Legend />
               <Area
                 type="monotone"
-                dataKey="allowed"
-                stroke="#00ff88"
+                dataKey="traffic_mb"
+                stroke="#00d4ff"
                 fillOpacity={1}
-                fill="url(#colorAllowed)"
-                name="Erlaubt"
-              />
-              <Area
-                type="monotone"
-                dataKey="blocked"
-                stroke="#ff4444"
-                fillOpacity={1}
-                fill="url(#colorBlocked)"
-                name="Blockiert"
+                fill="url(#colorTraffic)"
+                name="Traffic (MB)"
               />
             </AreaChart>
           </ResponsiveContainer>
