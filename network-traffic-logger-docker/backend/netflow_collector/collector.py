@@ -106,20 +106,206 @@ class NetFlowV5Parser:
             return None
 
 
+class NetFlowV9Parser:
+    """Parser for NetFlow v9 packets (template-based)"""
+
+    HEADER_FORMAT = '!HHIIII'
+    HEADER_SIZE = 20
+    FLOWSET_HEADER_FORMAT = '!HH'
+    FLOWSET_HEADER_SIZE = 4
+
+    # Common NetFlow v9 field types
+    FIELD_TYPES = {
+        1: ('IN_BYTES', 'I'),
+        2: ('IN_PKTS', 'I'),
+        4: ('PROTOCOL', 'B'),
+        5: ('TOS', 'B'),
+        7: ('L4_SRC_PORT', 'H'),
+        8: ('IPV4_SRC_ADDR', 'I'),
+        11: ('L4_DST_PORT', 'H'),
+        12: ('IPV4_DST_ADDR', 'I'),
+        15: ('IPV4_NEXT_HOP', 'I'),
+        16: ('SRC_AS', 'H'),
+        17: ('DST_AS', 'H'),
+        21: ('LAST_SWITCHED', 'I'),
+        22: ('FIRST_SWITCHED', 'I'),
+    }
+
+    def __init__(self):
+        self.templates = {}
+
+    def parse(self, data: bytes, source_id: str) -> Dict[str, Any]:
+        """Parse NetFlow v9 packet"""
+        try:
+            # Parse header
+            if len(data) < self.HEADER_SIZE:
+                logger.error(f"NetFlow v9 packet too small: {len(data)} bytes")
+                return None
+
+            header = struct.unpack(self.HEADER_FORMAT, data[:self.HEADER_SIZE])
+            version, count, sys_uptime, unix_secs, sequence, source_id_pkt = header
+
+            if version != 9:
+                logger.warning(f"Unexpected NetFlow version: {version}")
+                return None
+
+            logger.info(f"Received NetFlow v9 packet: count={count}, seq={sequence}")
+
+            flows = []
+            offset = self.HEADER_SIZE
+
+            # Parse flowsets
+            while offset < len(data):
+                if offset + self.FLOWSET_HEADER_SIZE > len(data):
+                    break
+
+                flowset_id, flowset_length = struct.unpack(
+                    self.FLOWSET_HEADER_FORMAT,
+                    data[offset:offset + self.FLOWSET_HEADER_SIZE]
+                )
+
+                if flowset_length == 0 or offset + flowset_length > len(data):
+                    break
+
+                if flowset_id == 0:  # Template FlowSet
+                    self.parse_template_flowset(data[offset + self.FLOWSET_HEADER_SIZE:offset + flowset_length], source_id)
+                elif flowset_id > 255:  # Data FlowSet
+                    flows.extend(self.parse_data_flowset(
+                        data[offset + self.FLOWSET_HEADER_SIZE:offset + flowset_length],
+                        flowset_id,
+                        source_id
+                    ))
+
+                offset += flowset_length
+
+            return {
+                'version': version,
+                'count': len(flows),
+                'timestamp': unix_secs,
+                'flows': flows
+            }
+
+        except Exception as e:
+            logger.error(f"Error parsing NetFlow v9: {e}")
+            return None
+
+    def parse_template_flowset(self, data: bytes, source_id: str):
+        """Parse template flowset"""
+        offset = 0
+        while offset < len(data) - 4:
+            template_id, field_count = struct.unpack('!HH', data[offset:offset + 4])
+            offset += 4
+
+            template = []
+            for _ in range(field_count):
+                if offset + 4 > len(data):
+                    break
+                field_type, field_length = struct.unpack('!HH', data[offset:offset + 4])
+                template.append((field_type, field_length))
+                offset += 4
+
+            template_key = f"{source_id}:{template_id}"
+            self.templates[template_key] = template
+            logger.info(f"Stored template {template_id} for source {source_id} with {field_count} fields")
+
+    def parse_data_flowset(self, data: bytes, template_id: int, source_id: str) -> List[Dict[str, Any]]:
+        """Parse data flowset using stored template"""
+        template_key = f"{source_id}:{template_id}"
+        if template_key not in self.templates:
+            logger.warning(f"Template {template_id} not found for source {source_id}")
+            return []
+
+        template = self.templates[template_key]
+        flows = []
+        offset = 0
+
+        # Calculate record size
+        record_size = sum(field_length for _, field_length in template)
+
+        while offset + record_size <= len(data):
+            flow = {}
+            field_offset = offset
+
+            for field_type, field_length in template:
+                if field_type in [8, 12, 15]:  # IPv4 addresses
+                    value = struct.unpack('!I', data[field_offset:field_offset + 4])[0]
+                    ip = socket.inet_ntoa(struct.pack('!I', value))
+                    if field_type == 8:
+                        flow['src_addr'] = ip
+                    elif field_type == 12:
+                        flow['dst_addr'] = ip
+                    elif field_type == 15:
+                        flow['next_hop'] = ip
+                elif field_type in [7, 11]:  # Ports
+                    value = struct.unpack('!H', data[field_offset:field_offset + 2])[0]
+                    if field_type == 7:
+                        flow['src_port'] = value
+                    elif field_type == 11:
+                        flow['dst_port'] = value
+                elif field_type in [1, 2]:  # Bytes and packets
+                    if field_length == 4:
+                        value = struct.unpack('!I', data[field_offset:field_offset + 4])[0]
+                    elif field_length == 8:
+                        value = struct.unpack('!Q', data[field_offset:field_offset + 8])[0]
+                    else:
+                        value = 0
+                    if field_type == 1:
+                        flow['bytes'] = value
+                    elif field_type == 2:
+                        flow['packets'] = value
+                elif field_type == 4:  # Protocol
+                    flow['protocol'] = struct.unpack('!B', data[field_offset:field_offset + 1])[0]
+
+                field_offset += field_length
+
+            # Set defaults for missing fields
+            flow.setdefault('src_addr', '0.0.0.0')
+            flow.setdefault('dst_addr', '0.0.0.0')
+            flow.setdefault('src_port', 0)
+            flow.setdefault('dst_port', 0)
+            flow.setdefault('bytes', 0)
+            flow.setdefault('packets', 0)
+            flow.setdefault('protocol', 0)
+            flow.setdefault('next_hop', '0.0.0.0')
+            flow.setdefault('tcp_flags', 0)
+            flow.setdefault('tos', 0)
+
+            flows.append(flow)
+            offset += record_size
+
+        return flows
+
+
 class NetFlowCollector:
     """NetFlow/sFlow Collector"""
 
     def __init__(self):
         self.running = False
+        self.netflow_v9_parser = NetFlowV9Parser()
 
     async def handle_netflow(self, data: bytes, addr: tuple):
         """Handle incoming NetFlow packet"""
         try:
-            parsed = NetFlowV5Parser.parse(data)
-            if not parsed:
+            # Detect NetFlow version from first 2 bytes
+            if len(data) < 2:
+                logger.error(f"Packet too small: {len(data)} bytes")
                 return
 
-            logger.info(f"Received NetFlow from {addr[0]} with {parsed['count']} flows")
+            version = struct.unpack('!H', data[0:2])[0]
+
+            # Parse based on version
+            if version == 5:
+                parsed = NetFlowV5Parser.parse(data)
+            elif version == 9:
+                parsed = self.netflow_v9_parser.parse(data, addr[0])
+            else:
+                logger.warning(f"Unsupported NetFlow version: {version}")
+                return
+
+            if not parsed or not parsed.get('flows'):
+                return
+
+            logger.info(f"Received NetFlow v{version} from {addr[0]} with {parsed['count']} flows")
 
             # Write to InfluxDB
             for flow in parsed['flows']:
