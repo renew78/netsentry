@@ -33,10 +33,10 @@ import {
   Edit as EditIcon,
   Save as SaveIcon,
   Shield as ShieldIcon,
-  Router as RouterIcon,
   Dns as DnsIcon,
   Security as SecurityIcon,
   NetworkCheck as NetworkCheckIcon,
+  Storage as StorageIcon,
 } from '@mui/icons-material';
 import axios from 'axios';
 
@@ -53,24 +53,26 @@ function TabPanel({ children, value, index }) {
 export default function Settings() {
   const [tabValue, setTabValue] = useState(0);
   const [settings, setSettings] = useState({
-    switches: [],
     vlans: [],
-    adguard: { enabled: false, url: '', username: '', password: '' },
-    opnsense: { enabled: false, url: '', apiKey: '', apiSecret: '' },
+    adguard: { enabled: false, url: '', apiKey: '' },
+    opnsense: {
+      enabled: false,
+      url: '',
+      apiKey: '',
+      apiSecret: '',
+      features: {
+        showDevices: true,
+        showFirewallStats: true,
+        showFirewallLogs: false,
+        showTrafficChart: false,
+      },
+    },
+    truenas: { enabled: false, url: '', apiKey: '' },
     ai_analysis: { enabled: false },
   });
   const [vlanDialog, setVlanDialog] = useState(false);
-  const [switchDialog, setSwitchDialog] = useState(false);
   const [editingVlan, setEditingVlan] = useState(null);
-  const [editingSwitch, setEditingSwitch] = useState(null);
   const [vlanForm, setVlanForm] = useState({ id: '', name: '', description: '' });
-  const [switchForm, setSwitchForm] = useState({
-    ip: '',
-    name: '',
-    username: '',
-    password: '',
-    type: 'tplink',
-  });
 
   useEffect(() => {
     fetchSettings();
@@ -79,7 +81,41 @@ export default function Settings() {
   const fetchSettings = async () => {
     try {
       const response = await axios.get(`${API_URL}/settings`);
-      setSettings(response.data);
+      // Merge with defaults to ensure all fields exist
+      const defaultSettings = {
+        vlans: [],
+        adguard: { enabled: false, url: '', apiKey: '' },
+        opnsense: {
+          enabled: false,
+          url: '',
+          apiKey: '',
+          apiSecret: '',
+          features: {
+            showDevices: true,
+            showFirewallStats: true,
+            showFirewallLogs: false,
+            showTrafficChart: false,
+          },
+        },
+        truenas: { enabled: false, url: '', apiKey: '' },
+        ai_analysis: { enabled: false },
+      };
+      const mergedSettings = {
+        ...defaultSettings,
+        ...response.data,
+        adguard: { ...defaultSettings.adguard, ...(response.data.adguard || {}) },
+        opnsense: {
+          ...defaultSettings.opnsense,
+          ...(response.data.opnsense || {}),
+          features: {
+            ...defaultSettings.opnsense.features,
+            ...((response.data.opnsense && response.data.opnsense.features) || {}),
+          },
+        },
+        truenas: { ...defaultSettings.truenas, ...(response.data.truenas || {}) },
+        ai_analysis: { ...defaultSettings.ai_analysis, ...(response.data.ai_analysis || {}) },
+      };
+      setSettings(mergedSettings);
     } catch (error) {
       console.error('Error fetching settings:', error);
     }
@@ -131,42 +167,6 @@ export default function Settings() {
     });
   };
 
-  const handleAddSwitch = () => {
-    setEditingSwitch(null);
-    setSwitchForm({ ip: '', name: '', username: '', password: '', type: 'tplink' });
-    setSwitchDialog(true);
-  };
-
-  const handleEditSwitch = (sw) => {
-    setEditingSwitch(sw);
-    setSwitchForm(sw);
-    setSwitchDialog(true);
-  };
-
-  const handleSaveSwitch = () => {
-    if (editingSwitch) {
-      setSettings({
-        ...settings,
-        switches: settings.switches.map((s) =>
-          s.ip === editingSwitch.ip ? switchForm : s
-        ),
-      });
-    } else {
-      setSettings({
-        ...settings,
-        switches: [...settings.switches, switchForm],
-      });
-    }
-    setSwitchDialog(false);
-  };
-
-  const handleDeleteSwitch = (switchIp) => {
-    setSettings({
-      ...settings,
-      switches: settings.switches.filter((s) => s.ip !== switchIp),
-    });
-  };
-
   return (
     <Box>
       <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
@@ -185,9 +185,9 @@ export default function Settings() {
           sx={{ borderBottom: 1, borderColor: 'divider' }}
         >
           <Tab icon={<NetworkCheckIcon />} label="VLANs" />
-          <Tab icon={<RouterIcon />} label="Switches" />
           <Tab icon={<DnsIcon />} label="AdGuard" />
           <Tab icon={<SecurityIcon />} label="OPNsense" />
+          <Tab icon={<StorageIcon />} label="TrueNAS" />
           <Tab icon={<ShieldIcon />} label="Erweitert" />
         </Tabs>
 
@@ -260,79 +260,8 @@ export default function Settings() {
             </TableContainer>
           </TabPanel>
 
-          {/* Switch Configuration */}
-          <TabPanel value={tabValue} index={1}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-              <Typography variant="h6">Switch-Zugangsdaten</Typography>
-              <Button
-                variant="contained"
-                startIcon={<AddIcon />}
-                onClick={handleAddSwitch}
-              >
-                Switch hinzufügen
-              </Button>
-            </Box>
-            <Alert severity="warning" sx={{ mb: 2 }}>
-              Ihre Switches unterstützen kein SNMP. Die Daten werden via Web-Scraping abgerufen.
-              Geben Sie hier die Login-Daten für die Web-GUI an.
-            </Alert>
-            <TableContainer>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>IP-Adresse</TableCell>
-                    <TableCell>Name</TableCell>
-                    <TableCell>Benutzername</TableCell>
-                    <TableCell>Typ</TableCell>
-                    <TableCell align="right">Aktionen</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {settings.switches.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={5} align="center">
-                        <Typography color="text.secondary">
-                          Keine Switches konfiguriert
-                        </Typography>
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    settings.switches.map((sw) => (
-                      <TableRow key={sw.ip}>
-                        <TableCell>
-                          <Typography fontFamily="monospace">{sw.ip}</Typography>
-                        </TableCell>
-                        <TableCell>{sw.name}</TableCell>
-                        <TableCell>{sw.username}</TableCell>
-                        <TableCell>
-                          <Chip label={sw.type} size="small" />
-                        </TableCell>
-                        <TableCell align="right">
-                          <IconButton
-                            size="small"
-                            onClick={() => handleEditSwitch(sw)}
-                            color="primary"
-                          >
-                            <EditIcon fontSize="small" />
-                          </IconButton>
-                          <IconButton
-                            size="small"
-                            onClick={() => handleDeleteSwitch(sw.ip)}
-                            color="error"
-                          >
-                            <DeleteIcon fontSize="small" />
-                          </IconButton>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </TabPanel>
-
           {/* AdGuard Configuration */}
-          <TabPanel value={tabValue} index={2}>
+          <TabPanel value={tabValue} index={1}>
             <Typography variant="h6" gutterBottom>
               AdGuard Home Integration
             </Typography>
@@ -371,45 +300,32 @@ export default function Settings() {
                   disabled={!settings.adguard.enabled}
                 />
               </Grid>
-              <Grid item xs={12} md={6}>
+              <Grid item xs={12}>
                 <TextField
                   fullWidth
-                  label="Benutzername"
-                  value={settings.adguard.username}
-                  onChange={(e) =>
-                    setSettings({
-                      ...settings,
-                      adguard: { ...settings.adguard, username: e.target.value },
-                    })
-                  }
-                  disabled={!settings.adguard.enabled}
-                />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
+                  label="API Key"
                   type="password"
-                  label="Passwort"
-                  value={settings.adguard.password}
+                  value={settings.adguard.apiKey}
                   onChange={(e) =>
                     setSettings({
                       ...settings,
-                      adguard: { ...settings.adguard, password: e.target.value },
+                      adguard: { ...settings.adguard, apiKey: e.target.value },
                     })
                   }
                   disabled={!settings.adguard.enabled}
+                  helperText="Sie finden den API Key in den AdGuard Einstellungen unter 'Allgemeine Einstellungen'"
                 />
               </Grid>
             </Grid>
           </TabPanel>
 
           {/* OPNsense Configuration */}
-          <TabPanel value={tabValue} index={3}>
+          <TabPanel value={tabValue} index={2}>
             <Typography variant="h6" gutterBottom>
               OPNsense Firewall Integration
             </Typography>
             <Alert severity="info" sx={{ mb: 3 }}>
-              Verbinden Sie NetSentry mit Ihrer OPNsense Firewall, um Firewall-Statistiken anzuzeigen.
+              Verbinden Sie NetSentry mit Ihrer OPNsense Firewall, um Firewall-Statistiken und Geräteliste anzuzeigen.
             </Alert>
             <Grid container spacing={3}>
               <Grid item xs={12}>
@@ -470,6 +386,164 @@ export default function Settings() {
                     })
                   }
                   disabled={!settings.opnsense.enabled}
+                />
+              </Grid>
+
+              {/* OPNsense Features */}
+              {settings.opnsense.enabled && (
+                <>
+                  <Grid item xs={12}>
+                    <Typography variant="subtitle1" sx={{ mt: 2, mb: 1, fontWeight: 600 }}>
+                      Anzuzeigende Komponenten
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          checked={settings.opnsense.features?.showDevices ?? true}
+                          onChange={(e) =>
+                            setSettings({
+                              ...settings,
+                              opnsense: {
+                                ...settings.opnsense,
+                                features: {
+                                  ...settings.opnsense.features,
+                                  showDevices: e.target.checked,
+                                },
+                              },
+                            })
+                          }
+                        />
+                      }
+                      label="Geräteliste anzeigen"
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          checked={settings.opnsense.features?.showFirewallStats ?? true}
+                          onChange={(e) =>
+                            setSettings({
+                              ...settings,
+                              opnsense: {
+                                ...settings.opnsense,
+                                features: {
+                                  ...settings.opnsense.features,
+                                  showFirewallStats: e.target.checked,
+                                },
+                              },
+                            })
+                          }
+                        />
+                      }
+                      label="Firewall-Statistiken anzeigen"
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          checked={settings.opnsense.features?.showFirewallLogs ?? false}
+                          onChange={(e) =>
+                            setSettings({
+                              ...settings,
+                              opnsense: {
+                                ...settings.opnsense,
+                                features: {
+                                  ...settings.opnsense.features,
+                                  showFirewallLogs: e.target.checked,
+                                },
+                              },
+                            })
+                          }
+                        />
+                      }
+                      label="Firewall-Logs anzeigen (experimentell)"
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          checked={settings.opnsense.features?.showTrafficChart ?? false}
+                          onChange={(e) =>
+                            setSettings({
+                              ...settings,
+                              opnsense: {
+                                ...settings.opnsense,
+                                features: {
+                                  ...settings.opnsense.features,
+                                  showTrafficChart: e.target.checked,
+                                },
+                              },
+                            })
+                          }
+                        />
+                      }
+                      label="Traffic-Diagramm anzeigen (experimentell)"
+                    />
+                  </Grid>
+                </>
+              )}
+            </Grid>
+          </TabPanel>
+
+          {/* TrueNAS Configuration */}
+          <TabPanel value={tabValue} index={3}>
+            <Typography variant="h6" gutterBottom>
+              TrueNAS Scale Integration
+            </Typography>
+            <Alert severity="info" sx={{ mb: 3 }}>
+              Verbinden Sie NetSentry mit Ihrem TrueNAS Scale Server, um Storage-Statistiken anzuzeigen.
+            </Alert>
+            <Grid container spacing={3}>
+              <Grid item xs={12}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={settings.truenas.enabled}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          truenas: { ...settings.truenas, enabled: e.target.checked },
+                        })
+                      }
+                    />
+                  }
+                  label="TrueNAS Integration aktivieren"
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="TrueNAS URL"
+                  placeholder="https://10.10.1.20"
+                  value={settings.truenas.url}
+                  onChange={(e) =>
+                    setSettings({
+                      ...settings,
+                      truenas: { ...settings.truenas, url: e.target.value },
+                    })
+                  }
+                  disabled={!settings.truenas.enabled}
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  type="password"
+                  label="API Key"
+                  value={settings.truenas.apiKey}
+                  onChange={(e) =>
+                    setSettings({
+                      ...settings,
+                      truenas: { ...settings.truenas, apiKey: e.target.value },
+                    })
+                  }
+                  disabled={!settings.truenas.enabled}
+                  helperText="Erstellen Sie einen API Key in TrueNAS unter System → API Keys"
                 />
               </Grid>
             </Grid>
@@ -565,70 +639,6 @@ export default function Settings() {
         <DialogActions>
           <Button onClick={() => setVlanDialog(false)}>Abbrechen</Button>
           <Button onClick={handleSaveVlan} variant="contained">
-            Speichern
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Switch Dialog */}
-      <Dialog open={switchDialog} onClose={() => setSwitchDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          {editingSwitch ? 'Switch bearbeiten' : 'Switch hinzufügen'}
-        </DialogTitle>
-        <DialogContent>
-          <Box sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <Alert severity="info">
-              Die Zugangsdaten werden verschlüsselt gespeichert und nur für das Web-Scraping verwendet.
-            </Alert>
-            <TextField
-              label="IP-Adresse"
-              value={switchForm.ip}
-              onChange={(e) => setSwitchForm({ ...switchForm, ip: e.target.value })}
-              fullWidth
-              required
-              placeholder="z.B. 10.10.1.100"
-              disabled={!!editingSwitch}
-            />
-            <TextField
-              label="Switch-Name"
-              value={switchForm.name}
-              onChange={(e) => setSwitchForm({ ...switchForm, name: e.target.value })}
-              fullWidth
-              required
-            />
-            <TextField
-              label="Benutzername"
-              value={switchForm.username}
-              onChange={(e) => setSwitchForm({ ...switchForm, username: e.target.value })}
-              fullWidth
-              required
-            />
-            <TextField
-              label="Passwort"
-              type="password"
-              value={switchForm.password}
-              onChange={(e) => setSwitchForm({ ...switchForm, password: e.target.value })}
-              fullWidth
-              required
-            />
-            <TextField
-              select
-              label="Switch-Typ"
-              value={switchForm.type}
-              onChange={(e) => setSwitchForm({ ...switchForm, type: e.target.value })}
-              fullWidth
-              SelectProps={{ native: true }}
-            >
-              <option value="tplink">TP-Link</option>
-              <option value="netgear">Netgear</option>
-              <option value="cisco">Cisco</option>
-              <option value="ubiquiti">Ubiquiti</option>
-            </TextField>
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setSwitchDialog(false)}>Abbrechen</Button>
-          <Button onClick={handleSaveSwitch} variant="contained">
             Speichern
           </Button>
         </DialogActions>

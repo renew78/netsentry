@@ -74,6 +74,11 @@ const StatCard = ({ title, value, unit, icon, color }) => (
 
 export default function OPNsense() {
   const [loading, setLoading] = useState(true);
+  const [settings, setSettings] = useState({
+    showFirewallStats: true,
+    showFirewallLogs: false,
+    showTrafficChart: false,
+  });
   const [stats, setStats] = useState({
     total_rules: 0,
     blocked_connections: 0,
@@ -87,23 +92,60 @@ export default function OPNsense() {
   const [trafficData, setTrafficData] = useState([]);
 
   useEffect(() => {
-    fetchOPNsenseData();
-    const interval = setInterval(fetchOPNsenseData, 30000); // Refresh every 30 seconds
-    return () => clearInterval(interval);
+    fetchSettings();
   }, []);
+
+  useEffect(() => {
+    if (settings) {
+      fetchOPNsenseData();
+      const interval = setInterval(fetchOPNsenseData, 30000); // Refresh every 30 seconds
+      return () => clearInterval(interval);
+    }
+  }, [settings]);
 
   useEffect(() => {
     filterLogs();
   }, [searchTerm, filterAction, firewallLogs]);
 
+  const fetchSettings = async () => {
+    try {
+      const response = await axios.get(`${API_URL}/settings`);
+      const features = response.data?.opnsense?.features || {
+        showFirewallStats: true,
+        showFirewallLogs: false,
+        showTrafficChart: false,
+      };
+      setSettings(features);
+    } catch (error) {
+      console.error('Error fetching settings:', error);
+    }
+  };
+
   const fetchOPNsenseData = async () => {
     setLoading(true);
     try {
-      const [statsRes, logsRes, trafficRes] = await Promise.all([
-        axios.get(`${API_URL}/opnsense/stats`),
-        axios.get(`${API_URL}/opnsense/logs`),
-        axios.get(`${API_URL}/opnsense/traffic`),
-      ]);
+      const requests = [];
+
+      // Only fetch data for enabled features
+      if (settings.showFirewallStats) {
+        requests.push(axios.get(`${API_URL}/opnsense/stats`));
+      } else {
+        requests.push(Promise.resolve({ data: { total_rules: 0, blocked_connections: 0, allowed_connections: 0, active_connections: 0 } }));
+      }
+
+      if (settings.showFirewallLogs) {
+        requests.push(axios.get(`${API_URL}/opnsense/logs`));
+      } else {
+        requests.push(Promise.resolve({ data: [] }));
+      }
+
+      if (settings.showTrafficChart) {
+        requests.push(axios.get(`${API_URL}/opnsense/traffic`));
+      } else {
+        requests.push(Promise.resolve({ data: [] }));
+      }
+
+      const [statsRes, logsRes, trafficRes] = await Promise.all(requests);
 
       setStats(statsRes.data || {
         total_rules: 0,
@@ -200,93 +242,87 @@ export default function OPNsense() {
       {loading && <LinearProgress sx={{ mb: 2 }} />}
 
       {/* Statistics Cards */}
-      <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid item xs={12} sm={6} md={3}>
-          <StatCard
-            title="Firewall Regeln"
-            value={stats.total_rules}
-            icon={<Speed sx={{ fontSize: 32, color: 'primary.main' }} />}
-            color="#00d4ff"
-          />
+      {settings.showFirewallStats && (
+        <Grid container spacing={3} sx={{ mb: 4 }}>
+          <Grid item xs={12} sm={6} md={3}>
+            <StatCard
+              title="Firewall Regeln"
+              value={stats.total_rules}
+              icon={<Speed sx={{ fontSize: 32, color: 'primary.main' }} />}
+              color="#00d4ff"
+            />
+          </Grid>
+          <Grid item xs={12} sm={6} md={3}>
+            <StatCard
+              title="Erlaubte Verbindungen"
+              value={stats.allowed_connections.toLocaleString()}
+              icon={<TrendingUp sx={{ fontSize: 32, color: 'success.main' }} />}
+              color="#00ff88"
+            />
+          </Grid>
+          <Grid item xs={12} sm={6} md={3}>
+            <StatCard
+              title="Blockierte Verbindungen"
+              value={stats.blocked_connections.toLocaleString()}
+              icon={<TrendingDown sx={{ fontSize: 32, color: 'error.main' }} />}
+              color="#ff4444"
+            />
+          </Grid>
+          <Grid item xs={12} sm={6} md={3}>
+            <StatCard
+              title="Aktive Verbindungen"
+              value={stats.active_connections}
+              icon={<WarningIcon sx={{ fontSize: 32, color: 'warning.main' }} />}
+              color="#ffaa00"
+            />
+          </Grid>
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <StatCard
-            title="Erlaubte Verbindungen"
-            value={stats.allowed_connections.toLocaleString()}
-            icon={<TrendingUp sx={{ fontSize: 32, color: 'success.main' }} />}
-            color="#00ff88"
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <StatCard
-            title="Blockierte Verbindungen"
-            value={stats.blocked_connections.toLocaleString()}
-            icon={<TrendingDown sx={{ fontSize: 32, color: 'error.main' }} />}
-            color="#ff4444"
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <StatCard
-            title="Aktive Verbindungen"
-            value={stats.active_connections}
-            icon={<WarningIcon sx={{ fontSize: 32, color: 'warning.main' }} />}
-            color="#ffaa00"
-          />
-        </Grid>
-      </Grid>
+      )}
 
       {/* Traffic Chart */}
-      <Card sx={{ mb: 3 }}>
-        <CardContent>
+      {settings.showTrafficChart && (
+        <Card sx={{ mb: 3 }}>
+          <CardContent>
           <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
-            Firewall Traffic (Letzte Stunde)
+            Netzwerk-Traffic (Letzte Stunde)
           </Typography>
           <ResponsiveContainer width="100%" height={300}>
             <AreaChart data={trafficData}>
               <defs>
-                <linearGradient id="colorAllowed" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#00ff88" stopOpacity={0.8} />
-                  <stop offset="95%" stopColor="#00ff88" stopOpacity={0} />
-                </linearGradient>
-                <linearGradient id="colorBlocked" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#ff4444" stopOpacity={0.8} />
-                  <stop offset="95%" stopColor="#ff4444" stopOpacity={0} />
+                <linearGradient id="colorTraffic" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#00d4ff" stopOpacity={0.8} />
+                  <stop offset="95%" stopColor="#00d4ff" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#2a2a3e" />
               <XAxis dataKey="time" stroke="#a0a0a0" />
-              <YAxis stroke="#a0a0a0" />
+              <YAxis stroke="#a0a0a0" label={{ value: 'MB', angle: -90, position: 'insideLeft', style: { fill: '#a0a0a0' } }} />
               <RechartsTooltip
                 contentStyle={{
                   backgroundColor: '#1a1a2e',
                   border: '1px solid #2a2a3e',
                   borderRadius: 8,
                 }}
+                formatter={(value) => [`${value} MB`, 'Traffic']}
               />
               <Legend />
               <Area
                 type="monotone"
-                dataKey="allowed"
-                stroke="#00ff88"
+                dataKey="traffic_mb"
+                stroke="#00d4ff"
                 fillOpacity={1}
-                fill="url(#colorAllowed)"
-                name="Erlaubt"
-              />
-              <Area
-                type="monotone"
-                dataKey="blocked"
-                stroke="#ff4444"
-                fillOpacity={1}
-                fill="url(#colorBlocked)"
-                name="Blockiert"
+                fill="url(#colorTraffic)"
+                name="Traffic (MB)"
               />
             </AreaChart>
           </ResponsiveContainer>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Firewall Logs */}
-      <Card>
+      {settings.showFirewallLogs && (
+        <Card>
         <CardContent>
           <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
             Firewall Protokoll
@@ -395,6 +431,7 @@ export default function OPNsense() {
           </Box>
         </CardContent>
       </Card>
+      )}
     </Box>
   );
 }

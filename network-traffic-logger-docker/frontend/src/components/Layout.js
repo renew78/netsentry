@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Drawer,
@@ -17,31 +17,65 @@ import {
   Menu as MenuIcon,
   Dashboard as DashboardIcon,
   Devices as DevicesIcon,
-  Router as RouterIcon,
   History as HistoryIcon,
   WifiTethering as WifiTetheringIcon,
   Dns as DnsIcon,
   Security as SecurityIcon,
+  Storage as StorageIcon,
   Settings as SettingsIcon,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
+import axios from 'axios';
 
+const API_URL = process.env.REACT_APP_BACKEND_URL || '/api';
 const drawerWidth = 260;
 
-const menuItems = [
-  { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
-  { text: 'Geräte', icon: <DevicesIcon />, path: '/devices' },
-  { text: 'Switches', icon: <RouterIcon />, path: '/switches' },
-  { text: 'AdGuard', icon: <DnsIcon />, path: '/adguard' },
-  { text: 'OPNsense', icon: <SecurityIcon />, path: '/opnsense' },
-  { text: 'Verlauf', icon: <HistoryIcon />, path: '/history' },
-  { text: 'Einstellungen', icon: <SettingsIcon />, path: '/settings' },
+// Define all possible menu items
+const allMenuItems = [
+  { text: 'Dashboard', icon: <DashboardIcon />, path: '/', alwaysShow: true },
+  { text: 'Geräte', icon: <DevicesIcon />, path: '/devices', alwaysShow: true },
+  { text: 'AdGuard', icon: <DnsIcon />, path: '/adguard', enabledKey: 'adguard' },
+  { text: 'OPNsense', icon: <SecurityIcon />, path: '/opnsense', enabledKey: 'opnsense' },
+  { text: 'TrueNAS', icon: <StorageIcon />, path: '/truenas', enabledKey: 'truenas' },
+  { text: 'Verlauf', icon: <HistoryIcon />, path: '/history', alwaysShow: true },
+  { text: 'Einstellungen', icon: <SettingsIcon />, path: '/settings', alwaysShow: true },
 ];
 
 export default function Layout({ children }) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [menuItems, setMenuItems] = useState([]);
   const navigate = useNavigate();
   const location = useLocation();
+
+  useEffect(() => {
+    fetchSettings();
+  }, []);
+
+  const fetchSettings = async () => {
+    try {
+      const response = await axios.get(`${API_URL}/settings`);
+      const settings = response.data;
+
+      // Filter menu items based on enabled integrations
+      const filteredItems = allMenuItems.filter(item => {
+        // Always show items without enabledKey
+        if (item.alwaysShow) return true;
+
+        // Check if integration is enabled
+        if (item.enabledKey && settings[item.enabledKey]) {
+          return settings[item.enabledKey].enabled === true;
+        }
+
+        return false;
+      });
+
+      setMenuItems(filteredItems);
+    } catch (error) {
+      console.error('Error fetching settings:', error);
+      // Fallback to showing all items if settings fetch fails
+      setMenuItems(allMenuItems.filter(item => item.alwaysShow));
+    }
+  };
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
@@ -52,7 +86,7 @@ export default function Layout({ children }) {
       <Toolbar sx={{ background: 'linear-gradient(135deg, #00d4ff 0%, #00a3cc 100%)' }}>
         <WifiTetheringIcon sx={{ mr: 1.5, fontSize: 32, color: 'white' }} />
         <Typography variant="h6" noWrap component="div" sx={{ color: 'white', fontWeight: 700 }}>
-          Network Traffic
+          NetSentry
         </Typography>
       </Toolbar>
       <Divider />
