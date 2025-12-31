@@ -214,6 +214,30 @@ async def truenas_api_call(endpoint: str):
         return None
 
 # Application lifecycle
+async def broadcast_traffic_updates():
+    """Background task to broadcast traffic stats via WebSocket"""
+    while True:
+        try:
+            await asyncio.sleep(3)  # Broadcast every 3 seconds
+
+            # Fetch current stats from Redis
+            redis_client = app.state.redis
+            total_bytes = int(await redis_client.get("stats:total_bytes") or 0)
+            total_packets = int(await redis_client.get("stats:total_packets") or 0)
+
+            # Broadcast to all connected clients
+            await manager.broadcast({
+                "type": "traffic_update",
+                "data": {
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "bytes": total_bytes,
+                    "packets": total_packets
+                }
+            })
+        except Exception as e:
+            print(f"Error broadcasting traffic updates: {e}")
+            await asyncio.sleep(5)
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
@@ -224,9 +248,13 @@ async def lifespan(app: FastAPI):
     if not await db.settings.find_one():
         await db.settings.insert_one(Settings().model_dump())
 
+    # Start background task for WebSocket broadcasts
+    broadcast_task = asyncio.create_task(broadcast_traffic_updates())
+
     yield
 
     # Shutdown
+    broadcast_task.cancel()
     await app.state.redis.close()
     await app.state.influx.close()
     mongo_client.close()
