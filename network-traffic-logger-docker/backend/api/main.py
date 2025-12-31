@@ -317,7 +317,7 @@ async def get_traffic_history(
           |> aggregateWindow(every: {interval}, fn: sum, createEmpty: false)
         '''
 
-        result = await query_api.query(query)
+        result = await query_api.query(query=query, org=INFLUXDB_ORG)
 
         data = []
         for table in result:
