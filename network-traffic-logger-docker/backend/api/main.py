@@ -853,17 +853,29 @@ async def get_camera_snapshot(camera_id: str):
         if not camera:
             raise HTTPException(status_code=404, detail="Camera not found")
 
-        # Reolink snapshot URL format
-        snapshot_url = f"http://{camera['host']}:{camera.get('port', 80)}/cgi-bin/api.cgi?cmd=Snap&channel=0&rs=snapshot&user={camera['username']}&password={camera['password']}"
+        # Reolink snapshot URL format (always use port 80 for HTTP snapshots, not RTSP port)
+        http_port = 80  # Reolink HTTP API port
+        snapshot_url = f"http://{camera['host']}:{http_port}/cgi-bin/api.cgi?cmd=Snap&channel=0&rs=snapshot&user={camera['username']}&password={camera['password']}"
+
+        print(f"[Camera] Fetching snapshot from: {snapshot_url.replace(camera['password'], '***')}")
 
         async with aiohttp.ClientSession() as session:
             async with session.get(snapshot_url, timeout=aiohttp.ClientTimeout(total=10)) as response:
+                print(f"[Camera] Snapshot response status: {response.status}")
                 if response.status == 200:
                     image_data = await response.read()
+                    print(f"[Camera] Snapshot received: {len(image_data)} bytes")
                     return Response(content=image_data, media_type="image/jpeg")
                 else:
-                    raise HTTPException(status_code=500, detail="Failed to get snapshot from camera")
+                    error_body = await response.text()
+                    print(f"[Camera] Snapshot failed: {response.status} - {error_body}")
+                    raise HTTPException(status_code=500, detail=f"Camera returned {response.status}: {error_body[:100]}")
+    except HTTPException:
+        raise
     except Exception as e:
+        print(f"[Camera] Snapshot exception: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Snapshot failed: {str(e)}")
 
 @app.get("/api/cameras/{camera_id}/stream")
