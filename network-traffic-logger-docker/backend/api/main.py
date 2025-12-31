@@ -462,6 +462,10 @@ async def get_opnsense_logs(group_by: str = "action"):
     print(f"[OPNsense] Fetching firewall statistics from {endpoint}")
     result = await opnsense_api_call(endpoint)
 
+    # Debug: Show what we got
+    print(f"[OPNsense] Firewall stats result type: {type(result)}")
+    print(f"[OPNsense] Firewall stats result: {result}")
+
     # OPNsense returns a list: [{"label":"pass","value":4965},{"label":"block","value":35}]
     if result and isinstance(result, list):
         print(f"[OPNsense] Received {len(result)} firewall statistics entries")
