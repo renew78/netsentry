@@ -867,7 +867,7 @@ async def get_camera_snapshot(camera_id: str):
         raise HTTPException(status_code=500, detail=f"Snapshot failed: {str(e)}")
 
 @app.get("/api/cameras/{camera_id}/stream")
-async def get_camera_stream_url(camera_id: str, quality: str = Query("main", regex="^(main|sub)$")):
+async def get_camera_stream_url(camera_id: str, quality: str = Query("main", pattern="^(main|sub)$")):
     """Get the RTSP stream URL for a camera"""
     try:
         camera = await db.cameras.find_one({"_id": ObjectId(camera_id)})
