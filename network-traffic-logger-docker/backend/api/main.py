@@ -214,6 +214,57 @@ async def truenas_api_call(endpoint: str):
         return None
 
 # Application lifecycle
+# Store previous values for rate calculation
+previous_stats = {"bytes": 0, "packets": 0, "timestamp": None}
+
+async def broadcast_traffic_updates():
+    """Background task to broadcast traffic stats via WebSocket"""
+    global previous_stats
+
+    while True:
+        try:
+            await asyncio.sleep(3)  # Broadcast every 3 seconds
+
+            # Fetch current stats from Redis
+            redis_client = app.state.redis
+            total_bytes = int(await redis_client.get("stats:total_bytes") or 0)
+            total_packets = int(await redis_client.get("stats:total_packets") or 0)
+
+            current_time = datetime.utcnow()
+
+            # Calculate rate (bytes/sec and packets/sec)
+            if previous_stats["timestamp"]:
+                time_delta = (current_time - previous_stats["timestamp"]).total_seconds()
+                if time_delta > 0:
+                    bytes_per_sec = int((total_bytes - previous_stats["bytes"]) / time_delta)
+                    packets_per_sec = int((total_packets - previous_stats["packets"]) / time_delta)
+                else:
+                    bytes_per_sec = 0
+                    packets_per_sec = 0
+            else:
+                bytes_per_sec = 0
+                packets_per_sec = 0
+
+            # Update previous stats
+            previous_stats = {
+                "bytes": total_bytes,
+                "packets": total_packets,
+                "timestamp": current_time
+            }
+
+            # Broadcast to all connected clients
+            await manager.broadcast({
+                "type": "traffic_update",
+                "data": {
+                    "timestamp": current_time.isoformat(),
+                    "bytes": bytes_per_sec,
+                    "packets": packets_per_sec
+                }
+            })
+        except Exception as e:
+            print(f"Error broadcasting traffic updates: {e}")
+            await asyncio.sleep(5)
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
@@ -224,9 +275,13 @@ async def lifespan(app: FastAPI):
     if not await db.settings.find_one():
         await db.settings.insert_one(Settings().model_dump())
 
+    # Start background task for WebSocket broadcasts
+    broadcast_task = asyncio.create_task(broadcast_traffic_updates())
+
     yield
 
     # Shutdown
+    broadcast_task.cancel()
     await app.state.redis.close()
     await app.state.influx.close()
     mongo_client.close()
@@ -396,15 +451,38 @@ async def get_opnsense_stats():
     }
 
 @app.get("/api/opnsense/logs")
-async def get_opnsense_logs():
-    """Get OPNsense firewall logs"""
-    # Note: The firewall log API endpoint varies by OPNsense version
-    # For now, returning placeholder data
-    # TODO: Find correct endpoint for OPNsense 25.7.9 or use log file parsing
+async def get_opnsense_logs(group_by: str = "action"):
+    """Get OPNsense firewall log statistics
 
-    print(f"[OPNsense] Firewall logs endpoint not available in this OPNsense version")
-    print(f"[OPNsense] To see logs, check OPNsense WebUI: Firewall > Log Files > Live View")
+    Args:
+        group_by: Grouping parameter - action, interface, protocol, src_ip, dst_ip, src_port, dst_port
+    """
+    # Fetch firewall stats with specified grouping
+    endpoint = f'/diagnostics/firewall/stats?group_by={group_by}'
+    print(f"[OPNsense] Fetching firewall statistics from {endpoint}")
+    result = await opnsense_api_call(endpoint)
 
+    # OPNsense returns a list: [{"label":"pass","value":4965},{"label":"block","value":35}]
+    if result and isinstance(result, list):
+        print(f"[OPNsense] Received {len(result)} firewall statistics entries")
+        # Format is already correct for frontend - just return as-is
+        return result
+    elif result and isinstance(result, dict):
+        # Fallback: if it returns a dict, try to extract data
+        print(f"[OPNsense] Firewall stats response keys: {result.keys()}")
+
+        # Try different formats
+        if 'data' in result:
+            return result.get('data', [])
+        else:
+            # Convert dict to list format
+            stats = []
+            for key, value in result.items():
+                if isinstance(value, int):
+                    stats.append({'label': key, 'value': value})
+            return stats
+
+    print(f"[OPNsense] No firewall statistics found or endpoint not available")
     return []
 
 @app.get("/api/opnsense/traffic")
