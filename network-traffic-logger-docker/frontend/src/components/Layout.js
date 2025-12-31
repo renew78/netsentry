@@ -22,6 +22,7 @@ import {
   Dns as DnsIcon,
   Security as SecurityIcon,
   Storage as StorageIcon,
+  Videocam as VideocamIcon,
   Settings as SettingsIcon,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -37,6 +38,7 @@ const allMenuItems = [
   { text: 'AdGuard', icon: <DnsIcon />, path: '/adguard', enabledKey: 'adguard' },
   { text: 'OPNsense', icon: <SecurityIcon />, path: '/opnsense', enabledKey: 'opnsense' },
   { text: 'TrueNAS', icon: <StorageIcon />, path: '/truenas', enabledKey: 'truenas' },
+  { text: 'Kameras', icon: <VideocamIcon />, path: '/cameras', alwaysShow: true },
   { text: 'Verlauf', icon: <HistoryIcon />, path: '/history', alwaysShow: true },
   { text: 'Einstellungen', icon: <SettingsIcon />, path: '/settings', alwaysShow: true },
 ];

@@ -7,6 +7,7 @@ import Devices from './pages/Devices';
 import AdGuard from './pages/AdGuard';
 import OPNsense from './pages/OPNsense';
 import TrueNAS from './pages/TrueNAS';
+import Cameras from './pages/Cameras';
 import History from './pages/History';
 import Settings from './pages/Settings';
 
@@ -118,6 +119,7 @@ function App() {
             <Route path="/adguard" element={<AdGuard />} />
             <Route path="/opnsense" element={<OPNsense />} />
             <Route path="/truenas" element={<TrueNAS />} />
+            <Route path="/cameras" element={<Cameras />} />
             <Route path="/history" element={<History />} />
             <Route path="/settings" element={<Settings />} />
           </Routes>
