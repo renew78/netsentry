@@ -453,9 +453,10 @@ async def get_opnsense_stats():
 @app.get("/api/opnsense/logs")
 async def get_opnsense_logs():
     """Get OPNsense firewall log statistics"""
-    # Try the diagnostics firewall stats endpoint (found via browser network tab)
-    print(f"[OPNsense] Fetching firewall statistics from /diagnostics/firewall/stats")
-    result = await opnsense_api_call('/diagnostics/firewall/stats')
+    # Try the diagnostics firewall stats endpoint with group_by parameter
+    # Found via browser network tab: /api/diagnostics/firewall/stats?group_by=action
+    print(f"[OPNsense] Fetching firewall statistics from /diagnostics/firewall/stats?group_by=action")
+    result = await opnsense_api_call('/diagnostics/firewall/stats?group_by=action')
 
     if result and isinstance(result, dict):
         print(f"[OPNsense] Firewall stats response keys: {result.keys()}")
