@@ -5,35 +5,21 @@ import {
   CardContent,
   Typography,
   Grid,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Chip,
   LinearProgress,
   IconButton,
   Tooltip,
-  TextField,
-  InputAdornment,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
+  Tabs,
+  Tab,
 } from '@mui/material';
 import {
   Security as SecurityIcon,
-  Block as BlockIcon,
-  CheckCircle as CheckCircleIcon,
   Refresh as RefreshIcon,
-  Search as SearchIcon,
   TrendingUp,
   TrendingDown,
   Speed,
   Warning as WarningIcon,
 } from '@mui/icons-material';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell } from 'recharts';
 import axios from 'axios';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL || '/api';
@@ -85,11 +71,10 @@ export default function OPNsense() {
     allowed_connections: 0,
     active_connections: 0,
   });
-  const [firewallLogs, setFirewallLogs] = useState([]);
-  const [filteredLogs, setFilteredLogs] = useState([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterAction, setFilterAction] = useState('all');
   const [trafficData, setTrafficData] = useState([]);
+  const [firewallStatsAction, setFirewallStatsAction] = useState([]);
+  const [firewallStatsInterface, setFirewallStatsInterface] = useState([]);
+  const [activeTab, setActiveTab] = useState(0);
 
   useEffect(() => {
     fetchSettings();
@@ -102,10 +87,6 @@ export default function OPNsense() {
       return () => clearInterval(interval);
     }
   }, [settings]);
-
-  useEffect(() => {
-    filterLogs();
-  }, [searchTerm, filterAction, firewallLogs]);
 
   const fetchSettings = async () => {
     try {
@@ -134,8 +115,10 @@ export default function OPNsense() {
       }
 
       if (settings.showFirewallLogs) {
-        requests.push(axios.get(`${API_URL}/opnsense/logs`));
+        requests.push(axios.get(`${API_URL}/opnsense/logs?group_by=action`));
+        requests.push(axios.get(`${API_URL}/opnsense/logs?group_by=interface`));
       } else {
+        requests.push(Promise.resolve({ data: [] }));
         requests.push(Promise.resolve({ data: [] }));
       }
 
@@ -145,7 +128,7 @@ export default function OPNsense() {
         requests.push(Promise.resolve({ data: [] }));
       }
 
-      const [statsRes, logsRes, trafficRes] = await Promise.all(requests);
+      const [statsRes, logsActionRes, logsInterfaceRes, trafficRes] = await Promise.all(requests);
 
       setStats(statsRes.data || {
         total_rules: 0,
@@ -153,7 +136,8 @@ export default function OPNsense() {
         allowed_connections: 0,
         active_connections: 0,
       });
-      setFirewallLogs(logsRes.data || []);
+      setFirewallStatsAction(logsActionRes.data || []);
+      setFirewallStatsInterface(logsInterfaceRes.data || []);
       setTrafficData(trafficRes.data || []);
     } catch (error) {
       console.error('Error fetching OPNsense data:', error);
@@ -163,64 +147,30 @@ export default function OPNsense() {
         allowed_connections: 0,
         active_connections: 0,
       });
-      setFirewallLogs([]);
+      setFirewallStatsAction([]);
+      setFirewallStatsInterface([]);
       setTrafficData([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const filterLogs = () => {
-    let filtered = firewallLogs;
-
-    if (searchTerm) {
-      filtered = filtered.filter(
-        (log) =>
-          log.source_ip.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          log.dest_ip.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          log.port.toString().includes(searchTerm) ||
-          log.protocol.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-
-    if (filterAction !== 'all') {
-      filtered = filtered.filter((log) => log.action === filterAction);
-    }
-
-    setFilteredLogs(filtered);
+  // Color palette for donut charts
+  const COLORS = {
+    pass: '#00ff88',
+    block: '#ff4444',
+    reject: '#ff4444',
+    wan: '#00d4ff',
+    MGMT: '#ffaa00',
+    IoT: '#ff00ff',
+    default: '#a0a0a0',
   };
 
-  const getActionChip = (action) => {
-    if (action === 'block' || action === 'reject') {
-      return (
-        <Chip
-          icon={<BlockIcon />}
-          label="Blockiert"
-          size="small"
-          color="error"
-          variant="outlined"
-        />
-      );
-    }
-    return (
-      <Chip
-        icon={<CheckCircleIcon />}
-        label="Erlaubt"
-        size="small"
-        color="success"
-        variant="outlined"
-      />
-    );
-  };
-
-  const getRuleChip = (ruleName) => {
-    if (!ruleName) return <Chip label="Default" size="small" />;
-    return <Chip label={ruleName} size="small" color="info" variant="outlined" />;
-  };
-
-  const formatTime = (timestamp) => {
-    const date = new Date(timestamp);
-    return date.toLocaleTimeString('de-DE');
+  const getColor = (label, index) => {
+    if (COLORS[label]) return COLORS[label];
+    // Generate colors for interfaces
+    const colorPalette = ['#00d4ff', '#00ff88', '#ffaa00', '#ff00ff', '#ff4444', '#a0a0a0', '#00ffff', '#ff6666'];
+    return colorPalette[index % colorPalette.length];
   };
 
   return (
@@ -320,117 +270,170 @@ export default function OPNsense() {
         </Card>
       )}
 
-      {/* Firewall Logs */}
+      {/* Firewall Statistics */}
       {settings.showFirewallLogs && (
         <Card>
-        <CardContent>
-          <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
-            Firewall Protokoll
-          </Typography>
+          <CardContent>
+            <Typography variant="h6" sx={{ fontWeight: 600, mb: 3 }}>
+              Firewall Statistiken
+            </Typography>
 
-          {/* Filters */}
-          <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
-            <TextField
-              fullWidth
-              size="small"
-              placeholder="Suche nach IP, Port oder Protokoll..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchIcon />
-                  </InputAdornment>
-                ),
-              }}
-            />
-            <FormControl size="small" sx={{ minWidth: 150 }}>
-              <InputLabel>Aktion</InputLabel>
-              <Select
-                value={filterAction}
-                label="Aktion"
-                onChange={(e) => setFilterAction(e.target.value)}
-              >
-                <MenuItem value="all">Alle</MenuItem>
-                <MenuItem value="allow">Nur Erlaubt</MenuItem>
-                <MenuItem value="block">Nur Blockiert</MenuItem>
-              </Select>
-            </FormControl>
-          </Box>
+            <Tabs
+              value={activeTab}
+              onChange={(e, newValue) => setActiveTab(newValue)}
+              sx={{ mb: 3, borderBottom: 1, borderColor: 'divider' }}
+            >
+              <Tab label="Aktionen" />
+              <Tab label="Interfaces" />
+            </Tabs>
 
-          <TableContainer sx={{ maxHeight: 600 }}>
-            <Table stickyHeader size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell>Zeit</TableCell>
-                  <TableCell>Aktion</TableCell>
-                  <TableCell>Quelle IP</TableCell>
-                  <TableCell>Ziel IP</TableCell>
-                  <TableCell>Port</TableCell>
-                  <TableCell>Protokoll</TableCell>
-                  <TableCell>Regel</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {filteredLogs.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} align="center">
-                      <Box sx={{ py: 4 }}>
-                        <SecurityIcon sx={{ fontSize: 64, color: 'text.disabled', mb: 2 }} />
-                        <Typography variant="h6" color="text.secondary">
-                          Keine Firewall-Logs gefunden
-                        </Typography>
-                        <Typography variant="body2" color="text.disabled">
-                          {searchTerm || filterAction !== 'all'
-                            ? 'Versuchen Sie andere Filter'
-                            : 'Warte auf Firewall-Aktivität...'}
-                        </Typography>
-                      </Box>
-                    </TableCell>
-                  </TableRow>
+            {/* Actions Tab */}
+            {activeTab === 0 && (
+              <Box>
+                {firewallStatsAction.length === 0 ? (
+                  <Box sx={{ py: 4, textAlign: 'center' }}>
+                    <SecurityIcon sx={{ fontSize: 64, color: 'text.disabled', mb: 2 }} />
+                    <Typography variant="h6" color="text.secondary">
+                      Keine Firewall-Daten gefunden
+                    </Typography>
+                    <Typography variant="body2" color="text.disabled">
+                      Warte auf Firewall-Aktivität...
+                    </Typography>
+                  </Box>
                 ) : (
-                  filteredLogs.map((log, idx) => (
-                    <TableRow key={idx} hover>
-                      <TableCell>
-                        <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>
-                          {formatTime(log.timestamp)}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>{getActionChip(log.action)}</TableCell>
-                      <TableCell>
-                        <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
-                          {log.source_ip}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
-                          {log.dest_ip}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Chip label={log.port} size="small" />
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2">{log.protocol}</Typography>
-                      </TableCell>
-                      <TableCell>{getRuleChip(log.rule_name)}</TableCell>
-                    </TableRow>
-                  ))
+                  <Grid container spacing={3}>
+                    <Grid item xs={12} md={6}>
+                      <ResponsiveContainer width="100%" height={300}>
+                        <PieChart>
+                          <Pie
+                            data={firewallStatsAction.map((item) => ({ name: item.label, value: item.value }))}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={60}
+                            outerRadius={100}
+                            fill="#8884d8"
+                            paddingAngle={5}
+                            dataKey="value"
+                            label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                          >
+                            {firewallStatsAction.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={getColor(entry.label, index)} />
+                            ))}
+                          </Pie>
+                          <RechartsTooltip
+                            contentStyle={{
+                              backgroundColor: '#1a1a2e',
+                              border: '1px solid #2a2a3e',
+                              borderRadius: 8,
+                            }}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </Grid>
+                    <Grid item xs={12} md={6}>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, justifyContent: 'center', height: '100%' }}>
+                        {firewallStatsAction.map((item, index) => (
+                          <Box key={index} sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                            <Box
+                              sx={{
+                                width: 20,
+                                height: 20,
+                                borderRadius: 1,
+                                backgroundColor: getColor(item.label, index)
+                              }}
+                            />
+                            <Typography variant="body1" sx={{ flex: 1 }}>
+                              {item.label === 'pass' ? 'Erlaubt' : item.label === 'block' ? 'Blockiert' : item.label}
+                            </Typography>
+                            <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                              {item.value.toLocaleString()}
+                            </Typography>
+                          </Box>
+                        ))}
+                      </Box>
+                    </Grid>
+                  </Grid>
                 )}
-              </TableBody>
-            </Table>
-          </TableContainer>
+              </Box>
+            )}
 
-          <Box sx={{ mt: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Typography variant="body2" color="text.secondary">
-              Anzeige: {filteredLogs.length} von {firewallLogs.length} Einträgen
-            </Typography>
-            <Typography variant="caption" color="text.disabled">
-              Aktualisiert alle 30 Sekunden
-            </Typography>
-          </Box>
-        </CardContent>
-      </Card>
+            {/* Interfaces Tab */}
+            {activeTab === 1 && (
+              <Box>
+                {firewallStatsInterface.length === 0 ? (
+                  <Box sx={{ py: 4, textAlign: 'center' }}>
+                    <SecurityIcon sx={{ fontSize: 64, color: 'text.disabled', mb: 2 }} />
+                    <Typography variant="h6" color="text.secondary">
+                      Keine Interface-Daten gefunden
+                    </Typography>
+                    <Typography variant="body2" color="text.disabled">
+                      Warte auf Firewall-Aktivität...
+                    </Typography>
+                  </Box>
+                ) : (
+                  <Grid container spacing={3}>
+                    <Grid item xs={12} md={6}>
+                      <ResponsiveContainer width="100%" height={300}>
+                        <PieChart>
+                          <Pie
+                            data={firewallStatsInterface.map((item) => ({ name: item.label, value: item.value }))}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={60}
+                            outerRadius={100}
+                            fill="#8884d8"
+                            paddingAngle={5}
+                            dataKey="value"
+                            label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                          >
+                            {firewallStatsInterface.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={getColor(entry.label, index)} />
+                            ))}
+                          </Pie>
+                          <RechartsTooltip
+                            contentStyle={{
+                              backgroundColor: '#1a1a2e',
+                              border: '1px solid #2a2a3e',
+                              borderRadius: 8,
+                            }}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </Grid>
+                    <Grid item xs={12} md={6}>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, justifyContent: 'center', height: '100%' }}>
+                        {firewallStatsInterface.map((item, index) => (
+                          <Box key={index} sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                            <Box
+                              sx={{
+                                width: 20,
+                                height: 20,
+                                borderRadius: 1,
+                                backgroundColor: getColor(item.label, index)
+                              }}
+                            />
+                            <Typography variant="body1" sx={{ flex: 1 }}>
+                              {item.label}
+                            </Typography>
+                            <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                              {item.value.toLocaleString()}
+                            </Typography>
+                          </Box>
+                        ))}
+                      </Box>
+                    </Grid>
+                  </Grid>
+                )}
+              </Box>
+            )}
+
+            <Box sx={{ mt: 3, textAlign: 'right' }}>
+              <Typography variant="caption" color="text.disabled">
+                Aktualisiert alle 30 Sekunden
+              </Typography>
+            </Box>
+          </CardContent>
+        </Card>
       )}
     </Box>
   );
