@@ -426,13 +426,41 @@ async def get_opnsense_stats():
 @app.get("/api/opnsense/logs")
 async def get_opnsense_logs():
     """Get OPNsense firewall logs"""
-    # Note: The firewall log API endpoint varies by OPNsense version
-    # For now, returning placeholder data
-    # TODO: Find correct endpoint for OPNsense 25.7.9 or use log file parsing
+    # Try multiple possible endpoints for firewall logs
+    endpoints_to_try = [
+        '/api/diagnostics/firewall/log',
+        '/api/firewall/log/query',
+        '/api/firewall/filter_log/search'
+    ]
 
-    print(f"[OPNsense] Firewall logs endpoint not available in this OPNsense version")
-    print(f"[OPNsense] To see logs, check OPNsense WebUI: Firewall > Log Files > Live View")
+    for endpoint in endpoints_to_try:
+        print(f"[OPNsense] Trying firewall log endpoint: {endpoint}")
+        result = await opnsense_api_call(endpoint)
 
+        if result and isinstance(result, dict):
+            # Extract logs from response
+            logs = result.get('rows', result.get('data', result.get('logs', [])))
+            if logs:
+                print(f"[OPNsense] Found {len(logs)} log entries using {endpoint}")
+                # Format logs for frontend
+                formatted_logs = []
+                for log in logs[:50]:  # Limit to 50 most recent
+                    if isinstance(log, dict):
+                        formatted_logs.append({
+                            'timestamp': log.get('timestamp', log.get('time', log.get('__timestamp__', ''))),
+                            'action': log.get('action', log.get('act', '')),
+                            'interface': log.get('interface', log.get('if', '')),
+                            'protocol': log.get('protocol', log.get('proto', '')),
+                            'src_ip': log.get('src', log.get('src_ip', log.get('source', ''))),
+                            'dst_ip': log.get('dst', log.get('dst_ip', log.get('destination', ''))),
+                            'src_port': log.get('src_port', log.get('sport', '')),
+                            'dst_port': log.get('dst_port', log.get('dport', '')),
+                            'description': log.get('label', log.get('description', log.get('desc', '')))
+                        })
+                return formatted_logs
+
+    print(f"[OPNsense] No firewall logs found. Firewall logging may not be enabled or API endpoint not available.")
+    print(f"[OPNsense] To enable: Firewall > Log Files > Settings > Enable firewall logging")
     return []
 
 @app.get("/api/opnsense/traffic")
