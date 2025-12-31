@@ -853,13 +853,15 @@ async def get_camera_snapshot(camera_id: str):
         if not camera:
             raise HTTPException(status_code=404, detail="Camera not found")
 
-        # Reolink snapshot URL format (always use port 80 for HTTP snapshots, not RTSP port)
-        http_port = 80  # Reolink HTTP API port
-        snapshot_url = f"http://{camera['host']}:{http_port}/cgi-bin/api.cgi?cmd=Snap&channel=0&rs=snapshot&user={camera['username']}&password={camera['password']}"
+        # Reolink uses HTTPS and redirects from HTTP
+        # Use HTTPS directly and disable SSL verification (self-signed cert)
+        snapshot_url = f"https://{camera['host']}/cgi-bin/api.cgi?cmd=Snap&channel=0&rs=snapshot&user={camera['username']}&password={camera['password']}"
 
         print(f"[Camera] Fetching snapshot from: {snapshot_url.replace(camera['password'], '***')}")
 
-        async with aiohttp.ClientSession() as session:
+        # Create a connector that doesn't verify SSL (Reolink uses self-signed certs)
+        connector = aiohttp.TCPConnector(ssl=False)
+        async with aiohttp.ClientSession(connector=connector) as session:
             async with session.get(snapshot_url, timeout=aiohttp.ClientTimeout(total=10)) as response:
                 print(f"[Camera] Snapshot response status: {response.status}")
                 if response.status == 200:
