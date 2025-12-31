@@ -415,7 +415,7 @@ async def get_opnsense_traffic():
 
         # Query traffic data for the last hour in 5-minute intervals
         query = f'''
-        from(bucket: "traffic")
+        from(bucket: "netflow")
             |> range(start: -1h)
             |> filter(fn: (r) => r["_measurement"] == "network_traffic")
             |> filter(fn: (r) => r["_field"] == "bytes")
@@ -423,7 +423,7 @@ async def get_opnsense_traffic():
             |> fill(value: 0)
         '''
 
-        result = query_api.query(query=query, org="network-monitoring")
+        result = await query_api.query(query=query, org="netsentry")
 
         # Process results into time series data
         traffic_by_time = {}
