@@ -451,41 +451,36 @@ async def get_opnsense_stats():
     }
 
 @app.get("/api/opnsense/logs")
-async def get_opnsense_logs():
-    """Get OPNsense firewall log statistics"""
-    # Try the diagnostics firewall stats endpoint with group_by parameter
-    # Found via browser network tab: /api/diagnostics/firewall/stats?group_by=action
-    print(f"[OPNsense] Fetching firewall statistics from /diagnostics/firewall/stats?group_by=action")
-    result = await opnsense_api_call('/diagnostics/firewall/stats?group_by=action')
+async def get_opnsense_logs(group_by: str = "action"):
+    """Get OPNsense firewall log statistics
 
-    if result and isinstance(result, dict):
+    Args:
+        group_by: Grouping parameter - action, interface, protocol, src_ip, dst_ip, src_port, dst_port
+    """
+    # Fetch firewall stats with specified grouping
+    endpoint = f'/diagnostics/firewall/stats?group_by={group_by}'
+    print(f"[OPNsense] Fetching firewall statistics from {endpoint}")
+    result = await opnsense_api_call(endpoint)
+
+    # OPNsense returns a list: [{"label":"pass","value":4965},{"label":"block","value":35}]
+    if result and isinstance(result, list):
+        print(f"[OPNsense] Received {len(result)} firewall statistics entries")
+        # Format is already correct for frontend - just return as-is
+        return result
+    elif result and isinstance(result, dict):
+        # Fallback: if it returns a dict, try to extract data
         print(f"[OPNsense] Firewall stats response keys: {result.keys()}")
 
-        # The response should contain interface statistics
-        # Format for frontend display
-        stats = []
-
-        # Check different possible response formats
-        if 'interfaces' in result:
-            # Format: {'interfaces': {'wan': 2935, 'mgmt': 1663, ...}}
-            for interface, count in result.get('interfaces', {}).items():
-                stats.append({
-                    'interface': interface,
-                    'count': count
-                })
-        elif 'data' in result:
-            stats = result.get('data', [])
+        # Try different formats
+        if 'data' in result:
+            return result.get('data', [])
         else:
-            # Try to extract any numeric data from the response
+            # Convert dict to list format
+            stats = []
             for key, value in result.items():
-                if isinstance(value, (int, dict)):
-                    stats.append({
-                        'interface': key,
-                        'count': value if isinstance(value, int) else len(value)
-                    })
-
-        print(f"[OPNsense] Returning {len(stats)} firewall statistics")
-        return stats
+                if isinstance(value, int):
+                    stats.append({'label': key, 'value': value})
+            return stats
 
     print(f"[OPNsense] No firewall statistics found or endpoint not available")
     return []
