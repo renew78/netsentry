@@ -15,10 +15,15 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Query, Body
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from pydantic import BaseModel, Field
 import redis.asyncio as redis
 from influxdb_client.client.influxdb_client_async import InfluxDBClientAsync
 from motor.motor_asyncio import AsyncIOMotorClient
+from bson import ObjectId
+
+# Import models
+from models import Camera, CameraCreate, CameraUpdate
 
 # Configuration
 MONGO_URL = os.getenv('MONGO_URL', 'mongodb://admin:password@mongodb:27017')
@@ -715,6 +720,123 @@ async def get_truenas_system():
         "uptime": "N/A",
         "loadavg": "N/A"
     }
+
+# ==================== Camera Endpoints ====================
+
+@app.get("/api/cameras", response_model=List[Camera])
+async def get_cameras():
+    """Get all configured cameras"""
+    cameras = []
+    async for camera in db.cameras.find():
+        camera['_id'] = str(camera['_id'])
+        cameras.append(Camera(**camera))
+    return cameras
+
+@app.post("/api/cameras", response_model=Camera)
+async def create_camera(camera: CameraCreate):
+    """Create a new camera configuration"""
+    camera_dict = camera.model_dump()
+    camera_dict['created_at'] = datetime.utcnow()
+    camera_dict['updated_at'] = datetime.utcnow()
+
+    result = await db.cameras.insert_one(camera_dict)
+    camera_dict['_id'] = str(result.inserted_id)
+
+    return Camera(**camera_dict)
+
+@app.get("/api/cameras/{camera_id}", response_model=Camera)
+async def get_camera(camera_id: str):
+    """Get a specific camera by ID"""
+    try:
+        camera = await db.cameras.find_one({"_id": ObjectId(camera_id)})
+        if not camera:
+            raise HTTPException(status_code=404, detail="Camera not found")
+
+        camera['_id'] = str(camera['_id'])
+        return Camera(**camera)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid camera ID: {str(e)}")
+
+@app.put("/api/cameras/{camera_id}", response_model=Camera)
+async def update_camera(camera_id: str, camera_update: CameraUpdate):
+    """Update an existing camera configuration"""
+    try:
+        # Only update fields that are provided
+        update_data = {k: v for k, v in camera_update.model_dump().items() if v is not None}
+
+        if not update_data:
+            raise HTTPException(status_code=400, detail="No update data provided")
+
+        update_data['updated_at'] = datetime.utcnow()
+
+        result = await db.cameras.update_one(
+            {"_id": ObjectId(camera_id)},
+            {"$set": update_data}
+        )
+
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Camera not found")
+
+        camera = await db.cameras.find_one({"_id": ObjectId(camera_id)})
+        camera['_id'] = str(camera['_id'])
+
+        return Camera(**camera)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Update failed: {str(e)}")
+
+@app.delete("/api/cameras/{camera_id}")
+async def delete_camera(camera_id: str):
+    """Delete a camera configuration"""
+    try:
+        result = await db.cameras.delete_one({"_id": ObjectId(camera_id)})
+
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="Camera not found")
+
+        return {"message": "Camera deleted successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Delete failed: {str(e)}")
+
+@app.get("/api/cameras/{camera_id}/snapshot")
+async def get_camera_snapshot(camera_id: str):
+    """Get a snapshot from the camera (for Reolink cameras)"""
+    try:
+        camera = await db.cameras.find_one({"_id": ObjectId(camera_id)})
+        if not camera:
+            raise HTTPException(status_code=404, detail="Camera not found")
+
+        # Reolink snapshot URL format
+        snapshot_url = f"http://{camera['host']}:{camera.get('port', 80)}/cgi-bin/api.cgi?cmd=Snap&channel=0&rs=snapshot&user={camera['username']}&password={camera['password']}"
+
+        async with aiohttp.ClientSession() as session:
+            async with session.get(snapshot_url, timeout=aiohttp.ClientTimeout(total=10)) as response:
+                if response.status == 200:
+                    image_data = await response.read()
+                    return Response(content=image_data, media_type="image/jpeg")
+                else:
+                    raise HTTPException(status_code=500, detail="Failed to get snapshot from camera")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Snapshot failed: {str(e)}")
+
+@app.get("/api/cameras/{camera_id}/stream")
+async def get_camera_stream_url(camera_id: str, quality: str = Query("main", regex="^(main|sub)$")):
+    """Get the RTSP stream URL for a camera"""
+    try:
+        camera = await db.cameras.find_one({"_id": ObjectId(camera_id)})
+        if not camera:
+            raise HTTPException(status_code=404, detail="Camera not found")
+
+        # Build RTSP URL
+        path = camera.get('rtsp_path', '/h264Preview_01_main') if quality == "main" else camera.get('sub_stream_path', '/h264Preview_01_sub')
+        rtsp_url = f"rtsp://{camera['username']}:{camera['password']}@{camera['host']}:{camera.get('port', 554)}{path}"
+
+        return {
+            "stream_url": rtsp_url,
+            "quality": quality,
+            "camera_name": camera.get('name', 'Unknown')
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to get stream URL: {str(e)}")
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
