@@ -452,42 +452,41 @@ async def get_opnsense_stats():
 
 @app.get("/api/opnsense/logs")
 async def get_opnsense_logs():
-    """Get OPNsense firewall logs"""
-    # Try multiple possible endpoints for firewall logs
-    endpoints_to_try = [
-        '/api/diagnostics/firewall/log',
-        '/api/firewall/log/query',
-        '/api/firewall/filter_log/search'
-    ]
+    """Get OPNsense firewall log statistics"""
+    # Try the diagnostics firewall stats endpoint (found via browser network tab)
+    print(f"[OPNsense] Fetching firewall statistics from /diagnostics/firewall/stats")
+    result = await opnsense_api_call('/diagnostics/firewall/stats')
 
-    for endpoint in endpoints_to_try:
-        print(f"[OPNsense] Trying firewall log endpoint: {endpoint}")
-        result = await opnsense_api_call(endpoint)
+    if result and isinstance(result, dict):
+        print(f"[OPNsense] Firewall stats response keys: {result.keys()}")
 
-        if result and isinstance(result, dict):
-            # Extract logs from response
-            logs = result.get('rows', result.get('data', result.get('logs', [])))
-            if logs:
-                print(f"[OPNsense] Found {len(logs)} log entries using {endpoint}")
-                # Format logs for frontend
-                formatted_logs = []
-                for log in logs[:50]:  # Limit to 50 most recent
-                    if isinstance(log, dict):
-                        formatted_logs.append({
-                            'timestamp': log.get('timestamp', log.get('time', log.get('__timestamp__', ''))),
-                            'action': log.get('action', log.get('act', '')),
-                            'interface': log.get('interface', log.get('if', '')),
-                            'protocol': log.get('protocol', log.get('proto', '')),
-                            'src_ip': log.get('src', log.get('src_ip', log.get('source', ''))),
-                            'dst_ip': log.get('dst', log.get('dst_ip', log.get('destination', ''))),
-                            'src_port': log.get('src_port', log.get('sport', '')),
-                            'dst_port': log.get('dst_port', log.get('dport', '')),
-                            'description': log.get('label', log.get('description', log.get('desc', '')))
-                        })
-                return formatted_logs
+        # The response should contain interface statistics
+        # Format for frontend display
+        stats = []
 
-    print(f"[OPNsense] No firewall logs found. Firewall logging may not be enabled or API endpoint not available.")
-    print(f"[OPNsense] To enable: Firewall > Log Files > Settings > Enable firewall logging")
+        # Check different possible response formats
+        if 'interfaces' in result:
+            # Format: {'interfaces': {'wan': 2935, 'mgmt': 1663, ...}}
+            for interface, count in result.get('interfaces', {}).items():
+                stats.append({
+                    'interface': interface,
+                    'count': count
+                })
+        elif 'data' in result:
+            stats = result.get('data', [])
+        else:
+            # Try to extract any numeric data from the response
+            for key, value in result.items():
+                if isinstance(value, (int, dict)):
+                    stats.append({
+                        'interface': key,
+                        'count': value if isinstance(value, int) else len(value)
+                    })
+
+        print(f"[OPNsense] Returning {len(stats)} firewall statistics")
+        return stats
+
+    print(f"[OPNsense] No firewall statistics found or endpoint not available")
     return []
 
 @app.get("/api/opnsense/traffic")
