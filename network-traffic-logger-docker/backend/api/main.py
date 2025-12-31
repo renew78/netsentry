@@ -8,6 +8,7 @@ import os
 import json
 import asyncio
 import aiohttp
+import ssl
 import base64
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
@@ -859,8 +860,16 @@ async def get_camera_snapshot(camera_id: str):
 
         print(f"[Camera] Fetching snapshot from: {snapshot_url.replace(camera['password'], '***')}")
 
-        # Create a connector that doesn't verify SSL (Reolink uses self-signed certs)
-        connector = aiohttp.TCPConnector(ssl=False)
+        # Create SSL context that accepts all certificates and protocols (for older cameras)
+        ssl_context = ssl.create_default_context()
+        ssl_context.check_hostname = False
+        ssl_context.verify_mode = ssl.CERT_NONE
+        # Allow older SSL/TLS versions for compatibility with older Reolink cameras
+        ssl_context.minimum_version = ssl.TLSVersion.MINIMUM_SUPPORTED
+        ssl_context.set_ciphers('DEFAULT@SECLEVEL=1')
+
+        # Create connector with permissive SSL context
+        connector = aiohttp.TCPConnector(ssl=ssl_context)
         async with aiohttp.ClientSession(connector=connector) as session:
             async with session.get(snapshot_url, timeout=aiohttp.ClientTimeout(total=10)) as response:
                 print(f"[Camera] Snapshot response status: {response.status}")
