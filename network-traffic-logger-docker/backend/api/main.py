@@ -214,8 +214,13 @@ async def truenas_api_call(endpoint: str):
         return None
 
 # Application lifecycle
+# Store previous values for rate calculation
+previous_stats = {"bytes": 0, "packets": 0, "timestamp": None}
+
 async def broadcast_traffic_updates():
     """Background task to broadcast traffic stats via WebSocket"""
+    global previous_stats
+
     while True:
         try:
             await asyncio.sleep(3)  # Broadcast every 3 seconds
@@ -225,13 +230,35 @@ async def broadcast_traffic_updates():
             total_bytes = int(await redis_client.get("stats:total_bytes") or 0)
             total_packets = int(await redis_client.get("stats:total_packets") or 0)
 
+            current_time = datetime.utcnow()
+
+            # Calculate rate (bytes/sec and packets/sec)
+            if previous_stats["timestamp"]:
+                time_delta = (current_time - previous_stats["timestamp"]).total_seconds()
+                if time_delta > 0:
+                    bytes_per_sec = int((total_bytes - previous_stats["bytes"]) / time_delta)
+                    packets_per_sec = int((total_packets - previous_stats["packets"]) / time_delta)
+                else:
+                    bytes_per_sec = 0
+                    packets_per_sec = 0
+            else:
+                bytes_per_sec = 0
+                packets_per_sec = 0
+
+            # Update previous stats
+            previous_stats = {
+                "bytes": total_bytes,
+                "packets": total_packets,
+                "timestamp": current_time
+            }
+
             # Broadcast to all connected clients
             await manager.broadcast({
                 "type": "traffic_update",
                 "data": {
-                    "timestamp": datetime.utcnow().isoformat(),
-                    "bytes": total_bytes,
-                    "packets": total_packets
+                    "timestamp": current_time.isoformat(),
+                    "bytes": bytes_per_sec,
+                    "packets": packets_per_sec
                 }
             })
         except Exception as e:
