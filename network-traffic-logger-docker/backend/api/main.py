@@ -723,16 +723,17 @@ async def get_truenas_system():
 
 # ==================== Camera Endpoints ====================
 
-@app.get("/api/cameras", response_model=List[Camera])
+@app.get("/api/cameras")
 async def get_cameras():
     """Get all configured cameras"""
     cameras = []
     async for camera in db.cameras.find():
-        camera['_id'] = str(camera['_id'])
-        cameras.append(Camera(**camera))
+        camera['id'] = str(camera['_id'])
+        camera.pop('_id', None)
+        cameras.append(camera)
     return cameras
 
-@app.post("/api/cameras", response_model=Camera)
+@app.post("/api/cameras")
 async def create_camera(camera: CameraCreate):
     """Create a new camera configuration"""
     camera_dict = camera.model_dump()
@@ -740,11 +741,12 @@ async def create_camera(camera: CameraCreate):
     camera_dict['updated_at'] = datetime.utcnow()
 
     result = await db.cameras.insert_one(camera_dict)
-    camera_dict['_id'] = str(result.inserted_id)
+    camera_dict['id'] = str(result.inserted_id)
+    camera_dict.pop('_id', None)
 
-    return Camera(**camera_dict)
+    return camera_dict
 
-@app.get("/api/cameras/{camera_id}", response_model=Camera)
+@app.get("/api/cameras/{camera_id}")
 async def get_camera(camera_id: str):
     """Get a specific camera by ID"""
     try:
@@ -752,17 +754,18 @@ async def get_camera(camera_id: str):
         if not camera:
             raise HTTPException(status_code=404, detail="Camera not found")
 
-        camera['_id'] = str(camera['_id'])
-        return Camera(**camera)
+        camera['id'] = str(camera['_id'])
+        camera.pop('_id', None)
+        return camera
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Invalid camera ID: {str(e)}")
 
-@app.put("/api/cameras/{camera_id}", response_model=Camera)
+@app.put("/api/cameras/{camera_id}")
 async def update_camera(camera_id: str, camera_update: CameraUpdate):
     """Update an existing camera configuration"""
     try:
         # Only update fields that are provided
-        update_data = {k: v for k, v in camera_update.model_dump().items() if v is not None}
+        update_data = {k: v for k, v in camera_update.model_dump(exclude_none=True).items() if v is not None}
 
         if not update_data:
             raise HTTPException(status_code=400, detail="No update data provided")
@@ -778,9 +781,10 @@ async def update_camera(camera_id: str, camera_update: CameraUpdate):
             raise HTTPException(status_code=404, detail="Camera not found")
 
         camera = await db.cameras.find_one({"_id": ObjectId(camera_id)})
-        camera['_id'] = str(camera['_id'])
+        camera['id'] = str(camera['_id'])
+        camera.pop('_id', None)
 
-        return Camera(**camera)
+        return camera
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Update failed: {str(e)}")
 

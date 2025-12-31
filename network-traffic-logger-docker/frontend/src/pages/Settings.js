@@ -552,7 +552,7 @@ export default function Settings() {
           </TabPanel>
 
           {/* Camera Configuration */}
-          <CameraSettings />
+          <CameraSettings tabValue={tabValue} />
 
           {/* Advanced Settings */}
           <TabPanel value={tabValue} index={5}>
@@ -653,7 +653,7 @@ export default function Settings() {
 }
 
 // Camera Settings Component
-function CameraSettings() {
+function CameraSettings({ tabValue }) {
   const [cameras, setCameras] = useState([]);
   const [cameraDialog, setCameraDialog] = useState(false);
   const [editingCamera, setEditingCamera] = useState(null);
@@ -739,7 +739,7 @@ function CameraSettings() {
   };
 
   return (
-    <TabPanel value={4} index={4}>
+    <TabPanel value={tabValue} index={4}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
         <Typography variant="h6">Kamera-Konfiguration</Typography>
         <Button
