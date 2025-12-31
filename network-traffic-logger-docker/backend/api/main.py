@@ -736,15 +736,19 @@ async def get_cameras():
 @app.post("/api/cameras")
 async def create_camera(camera: CameraCreate):
     """Create a new camera configuration"""
-    camera_dict = camera.model_dump()
-    camera_dict['created_at'] = datetime.utcnow()
-    camera_dict['updated_at'] = datetime.utcnow()
+    try:
+        camera_dict = camera.model_dump()
+        camera_dict['created_at'] = datetime.utcnow()
+        camera_dict['updated_at'] = datetime.utcnow()
 
-    result = await db.cameras.insert_one(camera_dict)
-    camera_dict['id'] = str(result.inserted_id)
-    camera_dict.pop('_id', None)
+        result = await db.cameras.insert_one(camera_dict)
+        camera_dict['id'] = str(result.inserted_id)
+        camera_dict.pop('_id', None)
 
-    return camera_dict
+        return camera_dict
+    except Exception as e:
+        print(f"Error creating camera: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Failed to create camera: {str(e)}")
 
 @app.get("/api/cameras/{camera_id}")
 async def get_camera(camera_id: str):
@@ -764,8 +768,8 @@ async def get_camera(camera_id: str):
 async def update_camera(camera_id: str, camera_update: CameraUpdate):
     """Update an existing camera configuration"""
     try:
-        # Only update fields that are provided
-        update_data = {k: v for k, v in camera_update.model_dump(exclude_none=True).items() if v is not None}
+        # Only update fields that are provided (exclude_none=True already filters None values)
+        update_data = camera_update.model_dump(exclude_none=True)
 
         if not update_data:
             raise HTTPException(status_code=400, detail="No update data provided")
@@ -785,7 +789,10 @@ async def update_camera(camera_id: str, camera_update: CameraUpdate):
         camera.pop('_id', None)
 
         return camera
+    except HTTPException:
+        raise
     except Exception as e:
+        print(f"Error updating camera: {str(e)}")
         raise HTTPException(status_code=400, detail=f"Update failed: {str(e)}")
 
 @app.delete("/api/cameras/{camera_id}")
