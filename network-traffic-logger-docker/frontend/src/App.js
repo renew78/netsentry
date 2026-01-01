@@ -1,7 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { ThemeProvider, createTheme, CssBaseline } from '@mui/material';
-import Layout from './components/Layout';
+import LayoutNew from './components/LayoutNew';
 import Dashboard from './pages/Dashboard';
 import Devices from './pages/Devices';
 import AdGuard from './pages/AdGuard';
@@ -10,6 +10,16 @@ import TrueNAS from './pages/TrueNAS';
 import Cameras from './pages/Cameras';
 import History from './pages/History';
 import Settings from './pages/Settings';
+
+// Reporting Pages
+import UnboundDNS from './pages/reporting/UnboundDNS';
+import Traffic from './pages/reporting/Traffic';
+import Insight from './pages/reporting/Insight';
+
+// Settings Pages
+import CameraSettings from './pages/cameras/CameraSettings';
+import OPNsenseSettings from './pages/opnsense/OPNsenseSettings';
+import TrueNASSettings from './pages/truenas/TrueNASSettings';
 
 // Dark Theme Configuration
 const darkTheme = createTheme({
@@ -112,18 +122,40 @@ function App() {
     <ThemeProvider theme={darkTheme}>
       <CssBaseline />
       <Router>
-        <Layout>
+        <LayoutNew>
           <Routes>
+            {/* Main Routes */}
             <Route path="/" element={<Dashboard />} />
             <Route path="/devices" element={<Devices />} />
+            <Route path="/settings" element={<Settings />} />
+
+            {/* Reporting Routes */}
+            <Route path="/reporting/unbound" element={<UnboundDNS />} />
+            <Route path="/reporting/traffic" element={<Traffic />} />
+            <Route path="/reporting/insight" element={<Insight />} />
+
+            {/* OPNsense Routes */}
+            <Route path="/opnsense/overview" element={<OPNsense />} />
+            <Route path="/opnsense/firewall" element={<OPNsense />} />
+            <Route path="/opnsense/settings" element={<OPNsenseSettings />} />
+
+            {/* TrueNAS Routes */}
+            <Route path="/truenas/storage" element={<TrueNAS />} />
+            <Route path="/truenas/system" element={<TrueNAS />} />
+            <Route path="/truenas/settings" element={<TrueNASSettings />} />
+
+            {/* Camera Routes */}
+            <Route path="/cameras/live" element={<Cameras />} />
+            <Route path="/cameras/settings" element={<CameraSettings />} />
+
+            {/* Legacy Routes (for backward compatibility) */}
             <Route path="/adguard" element={<AdGuard />} />
             <Route path="/opnsense" element={<OPNsense />} />
             <Route path="/truenas" element={<TrueNAS />} />
             <Route path="/cameras" element={<Cameras />} />
             <Route path="/history" element={<History />} />
-            <Route path="/settings" element={<Settings />} />
           </Routes>
-        </Layout>
+        </LayoutNew>
       </Router>
     </ThemeProvider>
   );
