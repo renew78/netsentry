@@ -107,11 +107,16 @@ export default function Traffic() {
                         <stop offset="95%" stopColor="#17a2b8" stopOpacity={0}/>
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#2d2d2d" />
-                    <XAxis dataKey="time" stroke="#adb5bd" />
-                    <YAxis stroke="#adb5bd" label={{ value: 'Mbps', angle: -90, position: 'insideLeft' }} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#dee2e6" />
+                    <XAxis dataKey="time" stroke="#495057" style={{ fontSize: 12 }} />
+                    <YAxis stroke="#495057" style={{ fontSize: 12 }} label={{ value: 'Mbps', angle: -90, position: 'insideLeft', style: { fill: '#495057' } }} />
                     <Tooltip
-                      contentStyle={{ backgroundColor: '#1e1e1e', border: '1px solid #2d2d2d', borderRadius: 4 }}
+                      contentStyle={{
+                        backgroundColor: '#ffffff',
+                        border: '1px solid #dee2e6',
+                        borderRadius: 3,
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                      }}
                     />
                     <Legend />
                     <Area type="monotone" dataKey="download" stroke="#17a2b8" fillOpacity={1} fill="url(#colorDownload)" />
@@ -160,11 +165,16 @@ export default function Traffic() {
             <Typography variant="h6" gutterBottom>Traffic by Protocol</Typography>
             <ResponsiveContainer width="100%" height={400}>
               <BarChart data={protocolData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#2d2d2d" />
-                <XAxis dataKey="protocol" stroke="#adb5bd" />
-                <YAxis stroke="#adb5bd" label={{ value: 'Bytes', angle: -90, position: 'insideLeft' }} />
+                <CartesianGrid strokeDasharray="3 3" stroke="#dee2e6" />
+                <XAxis dataKey="protocol" stroke="#495057" style={{ fontSize: 12 }} />
+                <YAxis stroke="#495057" style={{ fontSize: 12 }} label={{ value: 'Bytes', angle: -90, position: 'insideLeft', style: { fill: '#495057' } }} />
                 <Tooltip
-                  contentStyle={{ backgroundColor: '#1e1e1e', border: '1px solid #2d2d2d', borderRadius: 4 }}
+                  contentStyle={{
+                    backgroundColor: '#ffffff',
+                    border: '1px solid #dee2e6',
+                    borderRadius: 3,
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                  }}
                   formatter={(value) => `${(value / 1024 / 1024).toFixed(2)} MB`}
                 />
                 <Legend />
@@ -178,11 +188,16 @@ export default function Traffic() {
             <Typography variant="h6" gutterBottom>Top Bandwidth Consumers</Typography>
             <ResponsiveContainer width="100%" height={400}>
               <BarChart data={topTalkers} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" stroke="#2d2d2d" />
-                <XAxis type="number" stroke="#adb5bd" />
-                <YAxis dataKey="name" type="category" stroke="#adb5bd" width={120} />
+                <CartesianGrid strokeDasharray="3 3" stroke="#dee2e6" />
+                <XAxis type="number" stroke="#495057" style={{ fontSize: 12 }} />
+                <YAxis dataKey="name" type="category" stroke="#495057" style={{ fontSize: 12 }} width={120} />
                 <Tooltip
-                  contentStyle={{ backgroundColor: '#1e1e1e', border: '1px solid #2d2d2d', borderRadius: 4 }}
+                  contentStyle={{
+                    backgroundColor: '#ffffff',
+                    border: '1px solid #dee2e6',
+                    borderRadius: 3,
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                  }}
                   formatter={(value) => `${(value / 1024 / 1024).toFixed(2)} MB`}
                 />
                 <Legend />

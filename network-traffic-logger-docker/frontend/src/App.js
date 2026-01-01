@@ -21,86 +21,92 @@ import CameraSettings from './pages/cameras/CameraSettings';
 import OPNsenseSettings from './pages/opnsense/OPNsenseSettings';
 import TrueNASSettings from './pages/truenas/TrueNASSettings';
 
-// OPNsense-Style Theme Configuration
-const darkTheme = createTheme({
+// OPNsense-Style Theme Configuration (Light Mode wie Original OPNsense)
+const opnsenseTheme = createTheme({
   palette: {
-    mode: 'dark',
+    mode: 'light',
     primary: {
       main: '#d94f00', // OPNsense Orange
       light: '#ff7f3f',
       dark: '#a63d00',
     },
     secondary: {
-      main: '#6c757d', // OPNsense Gray
+      main: '#6c757d',
       light: '#9da5ad',
       dark: '#495057',
     },
     background: {
-      default: '#151515', // Sehr dunkel, wie OPNsense
-      paper: '#1e1e1e', // Dunkelgrau für Cards
+      default: '#f5f5f5', // Heller Hintergrund wie OPNsense
+      paper: '#ffffff', // Weiß für Cards
     },
     text: {
-      primary: '#e9ecef',
-      secondary: '#adb5bd',
+      primary: '#333333',
+      secondary: '#6c757d',
     },
     success: {
-      main: '#28a745',
+      main: '#5cb85c',
     },
     error: {
-      main: '#dc3545',
+      main: '#d9534f',
     },
     warning: {
-      main: '#ffc107',
+      main: '#f0ad4e',
     },
     info: {
-      main: '#17a2b8',
+      main: '#5bc0de',
     },
-    divider: '#2d2d2d',
+    divider: '#dee2e6',
   },
   typography: {
-    fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
-    fontSize: 14,
+    fontFamily: '"Roboto", "Helvetica Neue", "Arial", sans-serif',
+    fontSize: 13,
     h1: {
-      fontWeight: 500,
+      fontWeight: 400,
       fontSize: '2.5rem',
+      color: '#333333',
     },
     h2: {
-      fontWeight: 500,
+      fontWeight: 400,
       fontSize: '2rem',
+      color: '#333333',
     },
     h3: {
-      fontWeight: 500,
+      fontWeight: 400,
       fontSize: '1.75rem',
+      color: '#333333',
     },
     h4: {
-      fontWeight: 500,
+      fontWeight: 400,
       fontSize: '1.5rem',
+      color: '#333333',
     },
     h5: {
-      fontWeight: 500,
+      fontWeight: 400,
       fontSize: '1.25rem',
+      color: '#333333',
     },
     h6: {
       fontWeight: 500,
       fontSize: '1rem',
+      color: '#333333',
     },
     button: {
       textTransform: 'none',
-      fontWeight: 500,
+      fontWeight: 400,
     },
   },
   shape: {
-    borderRadius: 4, // OPNsense hat schärfere Ecken
+    borderRadius: 3,
   },
   components: {
     MuiCard: {
       styleOverrides: {
         root: {
           backgroundImage: 'none',
-          backgroundColor: '#1e1e1e',
-          borderRadius: 4,
-          border: '1px solid #2d2d2d',
-          boxShadow: 'none',
+          backgroundColor: '#ffffff',
+          borderRadius: 3,
+          border: '1px solid #ddd',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
         },
       },
     },
@@ -108,7 +114,7 @@ const darkTheme = createTheme({
       styleOverrides: {
         root: {
           backgroundImage: 'none',
-          backgroundColor: '#1e1e1e',
+          backgroundColor: '#ffffff',
         },
       },
     },
@@ -116,8 +122,8 @@ const darkTheme = createTheme({
       styleOverrides: {
         root: {
           textTransform: 'none',
-          fontWeight: 500,
-          borderRadius: 4,
+          fontWeight: 400,
+          borderRadius: 3,
         },
         contained: {
           boxShadow: 'none',
@@ -130,37 +136,40 @@ const darkTheme = createTheme({
     MuiChip: {
       styleOverrides: {
         root: {
-          fontWeight: 500,
-          borderRadius: 4,
+          fontWeight: 400,
+          borderRadius: 3,
         },
       },
     },
     MuiTableCell: {
       styleOverrides: {
         root: {
-          borderBottom: '1px solid #2d2d2d',
+          borderBottom: '1px solid #dee2e6',
+          padding: '12px',
         },
         head: {
-          backgroundColor: '#252525',
+          backgroundColor: '#f8f9fa',
           fontWeight: 600,
-          color: '#e9ecef',
+          color: '#495057',
+          borderBottom: '2px solid #dee2e6',
         },
       },
     },
     MuiDrawer: {
       styleOverrides: {
         paper: {
-          backgroundColor: '#1a1a1a',
-          borderRight: '1px solid #2d2d2d',
+          backgroundColor: '#ffffff',
+          borderRight: '1px solid #dee2e6',
         },
       },
     },
     MuiAppBar: {
       styleOverrides: {
         root: {
-          backgroundColor: '#1a1a1a',
-          borderBottom: '1px solid #2d2d2d',
-          boxShadow: 'none',
+          backgroundColor: '#ffffff',
+          borderBottom: '1px solid #dee2e6',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+          color: '#333333',
         },
       },
     },
@@ -168,8 +177,12 @@ const darkTheme = createTheme({
       styleOverrides: {
         root: {
           '& .MuiOutlinedInput-root': {
+            backgroundColor: '#ffffff',
             '& fieldset': {
-              borderColor: '#2d2d2d',
+              borderColor: '#ced4da',
+            },
+            '&:hover fieldset': {
+              borderColor: '#adb5bd',
             },
           },
         },
@@ -179,17 +192,33 @@ const darkTheme = createTheme({
       styleOverrides: {
         root: {
           textTransform: 'none',
-          fontWeight: 500,
+          fontWeight: 400,
+          color: '#6c757d',
           '&.Mui-selected': {
             color: '#d94f00',
+            fontWeight: 500,
           },
         },
       },
     },
     MuiTabs: {
       styleOverrides: {
+        root: {
+          borderBottom: '1px solid #dee2e6',
+        },
         indicator: {
           backgroundColor: '#d94f00',
+          height: 3,
+        },
+      },
+    },
+    MuiIconButton: {
+      styleOverrides: {
+        root: {
+          color: '#6c757d',
+          '&:hover': {
+            backgroundColor: 'rgba(217, 79, 0, 0.04)',
+          },
         },
       },
     },
@@ -198,7 +227,7 @@ const darkTheme = createTheme({
 
 function App() {
   return (
-    <ThemeProvider theme={darkTheme}>
+    <ThemeProvider theme={opnsenseTheme}>
       <CssBaseline />
       <Router>
         <LayoutNew>

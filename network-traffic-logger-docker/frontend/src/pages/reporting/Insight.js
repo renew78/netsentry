@@ -247,12 +247,17 @@ export default function Insight() {
               <Grid item xs={12}>
                 <ResponsiveContainer width="100%" height={300}>
                   <LineChart data={networkHealth}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#2d2d2d" />
-                    <XAxis dataKey="time" stroke="#adb5bd" />
-                    <YAxis stroke="#adb5bd" yAxisId="left" label={{ value: 'Latency (ms)', angle: -90, position: 'insideLeft' }} />
-                    <YAxis stroke="#adb5bd" yAxisId="right" orientation="right" label={{ value: 'Packet Loss (%)', angle: 90, position: 'insideRight' }} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#dee2e6" />
+                    <XAxis dataKey="time" stroke="#495057" style={{ fontSize: 12 }} />
+                    <YAxis stroke="#495057" style={{ fontSize: 12 }} yAxisId="left" label={{ value: 'Latency (ms)', angle: -90, position: 'insideLeft', style: { fill: '#495057' } }} />
+                    <YAxis stroke="#495057" style={{ fontSize: 12 }} yAxisId="right" orientation="right" label={{ value: 'Packet Loss (%)', angle: 90, position: 'insideRight', style: { fill: '#495057' } }} />
                     <Tooltip
-                      contentStyle={{ backgroundColor: '#1e1e1e', border: '1px solid #2d2d2d', borderRadius: 4 }}
+                      contentStyle={{
+                        backgroundColor: '#ffffff',
+                        border: '1px solid #dee2e6',
+                        borderRadius: 3,
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                      }}
                     />
                     <Legend />
                     <Line yAxisId="left" type="monotone" dataKey="latency" stroke="#17a2b8" strokeWidth={2} />

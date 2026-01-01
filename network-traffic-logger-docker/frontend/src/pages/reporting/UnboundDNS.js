@@ -110,11 +110,16 @@ export default function UnboundDNS() {
             <Typography variant="h6" gutterBottom>Most Queried Domains</Typography>
             <ResponsiveContainer width="100%" height={400}>
               <BarChart data={topDomains}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#2d2d2d" />
-                <XAxis dataKey="domain" stroke="#adb5bd" />
-                <YAxis stroke="#adb5bd" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#dee2e6" />
+                <XAxis dataKey="domain" stroke="#495057" style={{ fontSize: 12 }} />
+                <YAxis stroke="#495057" style={{ fontSize: 12 }} />
                 <Tooltip
-                  contentStyle={{ backgroundColor: '#1e1e1e', border: '1px solid #2d2d2d', borderRadius: 4 }}
+                  contentStyle={{
+                    backgroundColor: '#ffffff',
+                    border: '1px solid #dee2e6',
+                    borderRadius: 3,
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                  }}
                 />
                 <Legend />
                 <Bar dataKey="queries" fill="#d94f00" />
