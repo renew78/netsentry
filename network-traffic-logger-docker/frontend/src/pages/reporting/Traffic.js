@@ -39,10 +39,10 @@ export default function Traffic() {
   ];
 
   const protocolData = [
-    { protocol: 'HTTP/HTTPS', bytes: 15234567, color: '#00d4ff' },
-    { protocol: 'DNS', bytes: 892456, color: '#00ff88' },
-    { protocol: 'SSH', bytes: 234567, color: '#ff4444' },
-    { protocol: 'Other', bytes: 567890, color: '#ffaa00' },
+    { protocol: 'HTTP/HTTPS', bytes: 15234567, color: '#17a2b8' },
+    { protocol: 'DNS', bytes: 892456, color: '#28a745' },
+    { protocol: 'SSH', bytes: 234567, color: '#dc3545' },
+    { protocol: 'Other', bytes: 567890, color: '#ffc107' },
   ];
 
   const topTalkers = [
@@ -99,32 +99,32 @@ export default function Traffic() {
                   <AreaChart data={trafficData}>
                     <defs>
                       <linearGradient id="colorUpload" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#ff4444" stopOpacity={0.8}/>
-                        <stop offset="95%" stopColor="#ff4444" stopOpacity={0}/>
+                        <stop offset="5%" stopColor="#d94f00" stopOpacity={0.8}/>
+                        <stop offset="95%" stopColor="#d94f00" stopOpacity={0}/>
                       </linearGradient>
                       <linearGradient id="colorDownload" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#00d4ff" stopOpacity={0.8}/>
-                        <stop offset="95%" stopColor="#00d4ff" stopOpacity={0}/>
+                        <stop offset="5%" stopColor="#17a2b8" stopOpacity={0.8}/>
+                        <stop offset="95%" stopColor="#17a2b8" stopOpacity={0}/>
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#333" />
-                    <XAxis dataKey="time" stroke="#a0a0a0" />
-                    <YAxis stroke="#a0a0a0" label={{ value: 'Mbps', angle: -90, position: 'insideLeft' }} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#2d2d2d" />
+                    <XAxis dataKey="time" stroke="#adb5bd" />
+                    <YAxis stroke="#adb5bd" label={{ value: 'Mbps', angle: -90, position: 'insideLeft' }} />
                     <Tooltip
-                      contentStyle={{ backgroundColor: '#1a1a2e', border: '1px solid #2a2a3e', borderRadius: 8 }}
+                      contentStyle={{ backgroundColor: '#1e1e1e', border: '1px solid #2d2d2d', borderRadius: 4 }}
                     />
                     <Legend />
-                    <Area type="monotone" dataKey="download" stroke="#00d4ff" fillOpacity={1} fill="url(#colorDownload)" />
-                    <Area type="monotone" dataKey="upload" stroke="#ff4444" fillOpacity={1} fill="url(#colorUpload)" />
+                    <Area type="monotone" dataKey="download" stroke="#17a2b8" fillOpacity={1} fill="url(#colorDownload)" />
+                    <Area type="monotone" dataKey="upload" stroke="#d94f00" fillOpacity={1} fill="url(#colorUpload)" />
                   </AreaChart>
                 </ResponsiveContainer>
               </Grid>
 
               <Grid item xs={12} md={4}>
-                <Card variant="outlined" sx={{ backgroundColor: 'rgba(0, 212, 255, 0.05)' }}>
+                <Card variant="outlined" sx={{ backgroundColor: 'rgba(23, 162, 184, 0.1)' }}>
                   <CardContent>
                     <Typography variant="subtitle2" color="text.secondary">Total Download</Typography>
-                    <Typography variant="h4" sx={{ fontWeight: 600, color: '#00d4ff' }}>
+                    <Typography variant="h4" sx={{ fontWeight: 600, color: '#17a2b8' }}>
                       45.2 GB
                     </Typography>
                   </CardContent>
@@ -132,10 +132,10 @@ export default function Traffic() {
               </Grid>
 
               <Grid item xs={12} md={4}>
-                <Card variant="outlined" sx={{ backgroundColor: 'rgba(255, 68, 68, 0.05)' }}>
+                <Card variant="outlined" sx={{ backgroundColor: 'rgba(217, 79, 0, 0.1)' }}>
                   <CardContent>
                     <Typography variant="subtitle2" color="text.secondary">Total Upload</Typography>
-                    <Typography variant="h4" sx={{ fontWeight: 600, color: '#ff4444' }}>
+                    <Typography variant="h4" sx={{ fontWeight: 600, color: '#d94f00' }}>
                       12.8 GB
                     </Typography>
                   </CardContent>
@@ -143,10 +143,10 @@ export default function Traffic() {
               </Grid>
 
               <Grid item xs={12} md={4}>
-                <Card variant="outlined" sx={{ backgroundColor: 'rgba(0, 255, 136, 0.05)' }}>
+                <Card variant="outlined" sx={{ backgroundColor: 'rgba(40, 167, 69, 0.1)' }}>
                   <CardContent>
                     <Typography variant="subtitle2" color="text.secondary">Peak Rate</Typography>
-                    <Typography variant="h4" sx={{ fontWeight: 600, color: '#00ff88' }}>
+                    <Typography variant="h4" sx={{ fontWeight: 600, color: '#28a745' }}>
                       1.5 Gbps
                     </Typography>
                   </CardContent>
@@ -160,15 +160,15 @@ export default function Traffic() {
             <Typography variant="h6" gutterBottom>Traffic by Protocol</Typography>
             <ResponsiveContainer width="100%" height={400}>
               <BarChart data={protocolData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#333" />
-                <XAxis dataKey="protocol" stroke="#a0a0a0" />
-                <YAxis stroke="#a0a0a0" label={{ value: 'Bytes', angle: -90, position: 'insideLeft' }} />
+                <CartesianGrid strokeDasharray="3 3" stroke="#2d2d2d" />
+                <XAxis dataKey="protocol" stroke="#adb5bd" />
+                <YAxis stroke="#adb5bd" label={{ value: 'Bytes', angle: -90, position: 'insideLeft' }} />
                 <Tooltip
-                  contentStyle={{ backgroundColor: '#1a1a2e', border: '1px solid #2a2a3e', borderRadius: 8 }}
+                  contentStyle={{ backgroundColor: '#1e1e1e', border: '1px solid #2d2d2d', borderRadius: 4 }}
                   formatter={(value) => `${(value / 1024 / 1024).toFixed(2)} MB`}
                 />
                 <Legend />
-                <Bar dataKey="bytes" fill="#00d4ff" />
+                <Bar dataKey="bytes" fill="#d94f00" />
               </BarChart>
             </ResponsiveContainer>
           </TabPanel>
@@ -178,15 +178,15 @@ export default function Traffic() {
             <Typography variant="h6" gutterBottom>Top Bandwidth Consumers</Typography>
             <ResponsiveContainer width="100%" height={400}>
               <BarChart data={topTalkers} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" stroke="#333" />
-                <XAxis type="number" stroke="#a0a0a0" />
-                <YAxis dataKey="name" type="category" stroke="#a0a0a0" width={120} />
+                <CartesianGrid strokeDasharray="3 3" stroke="#2d2d2d" />
+                <XAxis type="number" stroke="#adb5bd" />
+                <YAxis dataKey="name" type="category" stroke="#adb5bd" width={120} />
                 <Tooltip
-                  contentStyle={{ backgroundColor: '#1a1a2e', border: '1px solid #2a2a3e', borderRadius: 8 }}
+                  contentStyle={{ backgroundColor: '#1e1e1e', border: '1px solid #2d2d2d', borderRadius: 4 }}
                   formatter={(value) => `${(value / 1024 / 1024).toFixed(2)} MB`}
                 />
                 <Legend />
-                <Bar dataKey="bytes" fill="#00ff88" />
+                <Bar dataKey="bytes" fill="#28a745" />
               </BarChart>
             </ResponsiveContainer>
           </TabPanel>

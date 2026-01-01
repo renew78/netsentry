@@ -24,9 +24,9 @@ export default function UnboundDNS() {
 
   // Placeholder data - will be replaced with real API data
   const queryStats = [
-    { name: 'Resolved', value: 15234, color: '#00ff88' },
-    { name: 'Blocked', value: 892, color: '#ff4444' },
-    { name: 'Cached', value: 8521, color: '#00d4ff' },
+    { name: 'Resolved', value: 15234, color: '#28a745' },
+    { name: 'Blocked', value: 892, color: '#dc3545' },
+    { name: 'Cached', value: 8521, color: '#17a2b8' },
   ];
 
   const topDomains = [
@@ -90,7 +90,7 @@ export default function UnboundDNS() {
                 <Grid container spacing={2}>
                   {queryStats.map((stat, index) => (
                     <Grid item xs={12} key={index}>
-                      <Card variant="outlined" sx={{ backgroundColor: 'rgba(0, 212, 255, 0.05)' }}>
+                      <Card variant="outlined">
                         <CardContent>
                           <Typography variant="subtitle2" color="text.secondary">{stat.name}</Typography>
                           <Typography variant="h4" sx={{ fontWeight: 600, color: stat.color }}>
@@ -110,14 +110,14 @@ export default function UnboundDNS() {
             <Typography variant="h6" gutterBottom>Most Queried Domains</Typography>
             <ResponsiveContainer width="100%" height={400}>
               <BarChart data={topDomains}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#333" />
-                <XAxis dataKey="domain" stroke="#a0a0a0" />
-                <YAxis stroke="#a0a0a0" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#2d2d2d" />
+                <XAxis dataKey="domain" stroke="#adb5bd" />
+                <YAxis stroke="#adb5bd" />
                 <Tooltip
-                  contentStyle={{ backgroundColor: '#1a1a2e', border: '1px solid #2a2a3e', borderRadius: 8 }}
+                  contentStyle={{ backgroundColor: '#1e1e1e', border: '1px solid #2d2d2d', borderRadius: 4 }}
                 />
                 <Legend />
-                <Bar dataKey="queries" fill="#00d4ff" />
+                <Bar dataKey="queries" fill="#d94f00" />
               </BarChart>
             </ResponsiveContainer>
           </TabPanel>

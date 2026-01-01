@@ -121,10 +121,9 @@ export default function Insight() {
                     variant="outlined"
                     sx={{
                       mb: 2,
-                      backgroundColor: 'rgba(0, 212, 255, 0.05)',
                       borderLeft: `4px solid ${
-                        insight.type === 'warning' ? '#ffaa00' :
-                        insight.type === 'success' ? '#00ff88' : '#00d4ff'
+                        insight.type === 'warning' ? '#ffc107' :
+                        insight.type === 'success' ? '#28a745' : '#17a2b8'
                       }`
                     }}
                   >
@@ -156,45 +155,45 @@ export default function Insight() {
               </Grid>
 
               <Grid item xs={12} md={4}>
-                <Card variant="outlined" sx={{ backgroundColor: 'rgba(0, 255, 136, 0.05)' }}>
+                <Card variant="outlined" sx={{ backgroundColor: 'rgba(40, 167, 69, 0.1)' }}>
                   <CardContent>
                     <Typography variant="subtitle2" color="text.secondary">Network Score</Typography>
-                    <Typography variant="h4" sx={{ fontWeight: 600, color: '#00ff88' }}>
+                    <Typography variant="h4" sx={{ fontWeight: 600, color: '#28a745' }}>
                       94/100
                     </Typography>
                     <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
-                      <TrendingUp sx={{ color: '#00ff88', mr: 0.5 }} />
-                      <Typography variant="caption" sx={{ color: '#00ff88' }}>+5 from yesterday</Typography>
+                      <TrendingUp sx={{ color: '#28a745', mr: 0.5 }} />
+                      <Typography variant="caption" sx={{ color: '#28a745' }}>+5 from yesterday</Typography>
                     </Box>
                   </CardContent>
                 </Card>
               </Grid>
 
               <Grid item xs={12} md={4}>
-                <Card variant="outlined" sx={{ backgroundColor: 'rgba(0, 212, 255, 0.05)' }}>
+                <Card variant="outlined" sx={{ backgroundColor: 'rgba(23, 162, 184, 0.1)' }}>
                   <CardContent>
                     <Typography variant="subtitle2" color="text.secondary">Active Devices</Typography>
-                    <Typography variant="h4" sx={{ fontWeight: 600, color: '#00d4ff' }}>
+                    <Typography variant="h4" sx={{ fontWeight: 600, color: '#17a2b8' }}>
                       42
                     </Typography>
                     <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
-                      <TrendingUp sx={{ color: '#00d4ff', mr: 0.5 }} />
-                      <Typography variant="caption" sx={{ color: '#00d4ff' }}>+3 new today</Typography>
+                      <TrendingUp sx={{ color: '#17a2b8', mr: 0.5 }} />
+                      <Typography variant="caption" sx={{ color: '#17a2b8' }}>+3 new today</Typography>
                     </Box>
                   </CardContent>
                 </Card>
               </Grid>
 
               <Grid item xs={12} md={4}>
-                <Card variant="outlined" sx={{ backgroundColor: 'rgba(255, 170, 0, 0.05)' }}>
+                <Card variant="outlined" sx={{ backgroundColor: 'rgba(255, 193, 7, 0.1)' }}>
                   <CardContent>
                     <Typography variant="subtitle2" color="text.secondary">Open Alerts</Typography>
-                    <Typography variant="h4" sx={{ fontWeight: 600, color: '#ffaa00' }}>
+                    <Typography variant="h4" sx={{ fontWeight: 600, color: '#ffc107' }}>
                       2
                     </Typography>
                     <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
-                      <TrendingDown sx={{ color: '#00ff88', mr: 0.5 }} />
-                      <Typography variant="caption" sx={{ color: '#00ff88' }}>-3 from yesterday</Typography>
+                      <TrendingDown sx={{ color: '#28a745', mr: 0.5 }} />
+                      <Typography variant="caption" sx={{ color: '#28a745' }}>-3 from yesterday</Typography>
                     </Box>
                   </CardContent>
                 </Card>
@@ -248,16 +247,16 @@ export default function Insight() {
               <Grid item xs={12}>
                 <ResponsiveContainer width="100%" height={300}>
                   <LineChart data={networkHealth}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#333" />
-                    <XAxis dataKey="time" stroke="#a0a0a0" />
-                    <YAxis stroke="#a0a0a0" yAxisId="left" label={{ value: 'Latency (ms)', angle: -90, position: 'insideLeft' }} />
-                    <YAxis stroke="#a0a0a0" yAxisId="right" orientation="right" label={{ value: 'Packet Loss (%)', angle: 90, position: 'insideRight' }} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#2d2d2d" />
+                    <XAxis dataKey="time" stroke="#adb5bd" />
+                    <YAxis stroke="#adb5bd" yAxisId="left" label={{ value: 'Latency (ms)', angle: -90, position: 'insideLeft' }} />
+                    <YAxis stroke="#adb5bd" yAxisId="right" orientation="right" label={{ value: 'Packet Loss (%)', angle: 90, position: 'insideRight' }} />
                     <Tooltip
-                      contentStyle={{ backgroundColor: '#1a1a2e', border: '1px solid #2a2a3e', borderRadius: 8 }}
+                      contentStyle={{ backgroundColor: '#1e1e1e', border: '1px solid #2d2d2d', borderRadius: 4 }}
                     />
                     <Legend />
-                    <Line yAxisId="left" type="monotone" dataKey="latency" stroke="#00d4ff" strokeWidth={2} />
-                    <Line yAxisId="right" type="monotone" dataKey="packetLoss" stroke="#ff4444" strokeWidth={2} />
+                    <Line yAxisId="left" type="monotone" dataKey="latency" stroke="#17a2b8" strokeWidth={2} />
+                    <Line yAxisId="right" type="monotone" dataKey="packetLoss" stroke="#dc3545" strokeWidth={2} />
                   </LineChart>
                 </ResponsiveContainer>
               </Grid>

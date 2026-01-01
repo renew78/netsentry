@@ -21,73 +21,86 @@ import CameraSettings from './pages/cameras/CameraSettings';
 import OPNsenseSettings from './pages/opnsense/OPNsenseSettings';
 import TrueNASSettings from './pages/truenas/TrueNASSettings';
 
-// Dark Theme Configuration
+// OPNsense-Style Theme Configuration
 const darkTheme = createTheme({
   palette: {
     mode: 'dark',
     primary: {
-      main: '#00d4ff',
-      light: '#5dfdff',
-      dark: '#00a3cc',
+      main: '#d94f00', // OPNsense Orange
+      light: '#ff7f3f',
+      dark: '#a63d00',
     },
     secondary: {
-      main: '#ff6b9d',
-      light: '#ff9dc8',
-      dark: '#cc3a6f',
+      main: '#6c757d', // OPNsense Gray
+      light: '#9da5ad',
+      dark: '#495057',
     },
     background: {
-      default: '#0f0f23',
-      paper: '#1a1a2e',
+      default: '#151515', // Sehr dunkel, wie OPNsense
+      paper: '#1e1e1e', // Dunkelgrau für Cards
     },
     text: {
-      primary: '#e0e0e0',
-      secondary: '#a0a0a0',
+      primary: '#e9ecef',
+      secondary: '#adb5bd',
     },
     success: {
-      main: '#00ff88',
+      main: '#28a745',
     },
     error: {
-      main: '#ff4444',
+      main: '#dc3545',
     },
     warning: {
-      main: '#ffaa00',
+      main: '#ffc107',
     },
     info: {
-      main: '#00d4ff',
+      main: '#17a2b8',
     },
+    divider: '#2d2d2d',
   },
   typography: {
-    fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+    fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
+    fontSize: 14,
     h1: {
-      fontWeight: 700,
+      fontWeight: 500,
+      fontSize: '2.5rem',
     },
     h2: {
-      fontWeight: 600,
+      fontWeight: 500,
+      fontSize: '2rem',
     },
     h3: {
-      fontWeight: 600,
+      fontWeight: 500,
+      fontSize: '1.75rem',
     },
     h4: {
-      fontWeight: 600,
+      fontWeight: 500,
+      fontSize: '1.5rem',
     },
     h5: {
       fontWeight: 500,
+      fontSize: '1.25rem',
     },
     h6: {
+      fontWeight: 500,
+      fontSize: '1rem',
+    },
+    button: {
+      textTransform: 'none',
       fontWeight: 500,
     },
   },
   shape: {
-    borderRadius: 12,
+    borderRadius: 4, // OPNsense hat schärfere Ecken
   },
   components: {
     MuiCard: {
       styleOverrides: {
         root: {
           backgroundImage: 'none',
-          backgroundColor: '#1a1a2e',
-          borderRadius: 12,
-          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.5)',
+          backgroundColor: '#1e1e1e',
+          borderRadius: 4,
+          border: '1px solid #2d2d2d',
+          boxShadow: 'none',
         },
       },
     },
@@ -95,6 +108,7 @@ const darkTheme = createTheme({
       styleOverrides: {
         root: {
           backgroundImage: 'none',
+          backgroundColor: '#1e1e1e',
         },
       },
     },
@@ -102,8 +116,14 @@ const darkTheme = createTheme({
       styleOverrides: {
         root: {
           textTransform: 'none',
-          fontWeight: 600,
-          borderRadius: 8,
+          fontWeight: 500,
+          borderRadius: 4,
+        },
+        contained: {
+          boxShadow: 'none',
+          '&:hover': {
+            boxShadow: 'none',
+          },
         },
       },
     },
@@ -111,6 +131,65 @@ const darkTheme = createTheme({
       styleOverrides: {
         root: {
           fontWeight: 500,
+          borderRadius: 4,
+        },
+      },
+    },
+    MuiTableCell: {
+      styleOverrides: {
+        root: {
+          borderBottom: '1px solid #2d2d2d',
+        },
+        head: {
+          backgroundColor: '#252525',
+          fontWeight: 600,
+          color: '#e9ecef',
+        },
+      },
+    },
+    MuiDrawer: {
+      styleOverrides: {
+        paper: {
+          backgroundColor: '#1a1a1a',
+          borderRight: '1px solid #2d2d2d',
+        },
+      },
+    },
+    MuiAppBar: {
+      styleOverrides: {
+        root: {
+          backgroundColor: '#1a1a1a',
+          borderBottom: '1px solid #2d2d2d',
+          boxShadow: 'none',
+        },
+      },
+    },
+    MuiTextField: {
+      styleOverrides: {
+        root: {
+          '& .MuiOutlinedInput-root': {
+            '& fieldset': {
+              borderColor: '#2d2d2d',
+            },
+          },
+        },
+      },
+    },
+    MuiTab: {
+      styleOverrides: {
+        root: {
+          textTransform: 'none',
+          fontWeight: 500,
+          '&.Mui-selected': {
+            color: '#d94f00',
+          },
+        },
+      },
+    },
+    MuiTabs: {
+      styleOverrides: {
+        indicator: {
+          backgroundColor: '#d94f00',
         },
       },
     },
