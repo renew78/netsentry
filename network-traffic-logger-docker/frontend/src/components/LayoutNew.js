@@ -170,9 +170,9 @@ export default function LayoutNew({ children }) {
 
   const drawer = (
     <Box>
-      <Toolbar sx={{ background: 'linear-gradient(135deg, #00d4ff 0%, #00a3cc 100%)' }}>
+      <Toolbar sx={{ background: 'linear-gradient(135deg, #d94f00 0%, #a63d00 100%)' }}>
         <WifiTetheringIcon sx={{ mr: 1.5, fontSize: 32, color: 'white' }} />
-        <Typography variant="h6" noWrap component="div" sx={{ color: 'white', fontWeight: 700 }}>
+        <Typography variant="h6" noWrap component="div" sx={{ color: 'white', fontWeight: 600 }}>
           NetSentry
         </Typography>
       </Toolbar>
@@ -187,9 +187,9 @@ export default function LayoutNew({ children }) {
                 sx={{
                   borderRadius: 2,
                   '&.Mui-selected': {
-                    backgroundColor: 'rgba(0, 212, 255, 0.15)',
+                    backgroundColor: 'rgba(217, 79, 0, 0.1)',
                     '&:hover': {
-                      backgroundColor: 'rgba(0, 212, 255, 0.25)',
+                      backgroundColor: 'rgba(217, 79, 0, 0.15)',
                     },
                   },
                 }}
@@ -228,9 +228,9 @@ export default function LayoutNew({ children }) {
                           borderRadius: 2,
                           py: 0.75,
                           '&.Mui-selected': {
-                            backgroundColor: 'rgba(0, 212, 255, 0.15)',
+                            backgroundColor: 'rgba(217, 79, 0, 0.08)',
                             '&:hover': {
-                              backgroundColor: 'rgba(0, 212, 255, 0.25)',
+                              backgroundColor: 'rgba(217, 79, 0, 0.12)',
                             },
                           },
                         }}
@@ -287,9 +287,6 @@ export default function LayoutNew({ children }) {
         sx={{
           width: { sm: `calc(100% - ${drawerWidth}px)` },
           ml: { sm: `${drawerWidth}px` },
-          background: 'linear-gradient(90deg, rgba(26, 26, 46, 0.95) 0%, rgba(15, 15, 35, 0.95) 100%)',
-          backdropFilter: 'blur(10px)',
-          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.5)',
         }}
       >
         <Toolbar>
@@ -343,7 +340,7 @@ export default function LayoutNew({ children }) {
           p: 3,
           width: { sm: `calc(100% - ${drawerWidth}px)` },
           minHeight: '100vh',
-          backgroundColor: '#0f0f23',
+          backgroundColor: 'background.default', // Verwendet Theme-Farbe
         }}
       >
         <Toolbar />
