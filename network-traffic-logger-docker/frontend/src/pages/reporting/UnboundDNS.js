@@ -114,6 +114,7 @@ export default function UnboundDNS() {
     fetchDNSData();
     const interval = setInterval(fetchDNSData, 30000); // Refresh every 30 seconds
     return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Use fetched data or fallback to placeholder

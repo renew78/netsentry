@@ -13,7 +13,7 @@ import {
   InputLabel,
 } from '@mui/material';
 import { BarChart as BarChartIcon } from '@mui/icons-material';
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Area, AreaChart } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Area, AreaChart } from 'recharts';
 
 function TabPanel({ children, value, index }) {
   return (
