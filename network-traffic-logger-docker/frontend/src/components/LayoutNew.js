@@ -66,7 +66,6 @@ const menuStructure = [
     enabledKey: 'opnsense',
     submenu: [
       { text: 'Overview', path: '/opnsense/overview' },
-      { text: 'Firewall', path: '/opnsense/firewall' },
       { text: 'Settings', icon: <SettingsIcon />, path: '/opnsense/settings' },
     ]
   },
@@ -76,7 +75,6 @@ const menuStructure = [
     enabledKey: 'truenas',
     submenu: [
       { text: 'Storage', path: '/truenas/storage' },
-      { text: 'System', path: '/truenas/system' },
       { text: 'Settings', icon: <SettingsIcon />, path: '/truenas/settings' },
     ]
   },
@@ -118,6 +116,7 @@ export default function LayoutNew({ children }) {
         }
       }
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname]);
 
   const fetchSettings = async () => {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Box,
   Card,
@@ -13,7 +13,7 @@ import {
   InputLabel,
 } from '@mui/material';
 import { BarChart as BarChartIcon } from '@mui/icons-material';
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Area, AreaChart } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Area, AreaChart } from 'recharts';
 
 function TabPanel({ children, value, index }) {
   return (
@@ -46,11 +46,26 @@ export default function Traffic() {
   ];
 
   const topTalkers = [
-    { device: '10.10.1.10', name: 'Desktop-PC', bytes: 8521234 },
-    { device: '10.10.1.20', name: 'Laptop', bytes: 4521234 },
-    { device: '10.10.1.30', name: 'Smartphone', bytes: 2521234 },
-    { device: '10.10.1.40', name: 'Tablet', bytes: 1521234 },
-    { device: '10.10.1.50', name: 'Smart-TV', bytes: 821234 },
+    { ip: '10.10.1.10', hostname: 'desktop-main.local', bytes: 8521234, label: '10.10.1.10 - desktop-main.local' },
+    { ip: '10.10.1.20', hostname: 'laptop-work.local', bytes: 4521234, label: '10.10.1.20 - laptop-work.local' },
+    { ip: '10.10.1.30', hostname: 'iphone-12.local', bytes: 3521234, label: '10.10.1.30 - iphone-12.local' },
+    { ip: '10.10.1.40', hostname: 'ipad-pro.local', bytes: 2521234, label: '10.10.1.40 - ipad-pro.local' },
+    { ip: '10.10.1.50', hostname: 'smart-tv.local', bytes: 1821234, label: '10.10.1.50 - smart-tv.local' },
+    { ip: '10.10.1.60', hostname: 'nas-server.local', bytes: 1521234, label: '10.10.1.60 - nas-server.local' },
+    { ip: '10.10.1.70', hostname: 'pi-hole.local', bytes: 1321234, label: '10.10.1.70 - pi-hole.local' },
+    { ip: '10.10.1.80', hostname: 'gaming-pc.local', bytes: 1121234, label: '10.10.1.80 - gaming-pc.local' },
+    { ip: '10.10.1.90', hostname: 'macbook-air.local', bytes: 921234, label: '10.10.1.90 - macbook-air.local' },
+    { ip: '10.10.1.100', hostname: 'android-phone.local', bytes: 821234, label: '10.10.1.100 - android-phone.local' },
+    { ip: '10.10.2.10', hostname: 'printer-office.local', bytes: 721234, label: '10.10.2.10 - printer-office.local' },
+    { ip: '10.10.2.20', hostname: 'security-cam-1.local', bytes: 621234, label: '10.10.2.20 - security-cam-1.local' },
+    { ip: '10.10.2.30', hostname: 'security-cam-2.local', bytes: 521234, label: '10.10.2.30 - security-cam-2.local' },
+    { ip: '10.10.2.40', hostname: 'chromebook.local', bytes: 421234, label: '10.10.2.40 - chromebook.local' },
+    { ip: '10.10.2.50', hostname: 'switch-office.local', bytes: 321234, label: '10.10.2.50 - switch-office.local' },
+    { ip: '10.10.3.10', hostname: 'sonos-speaker.local', bytes: 281234, label: '10.10.3.10 - sonos-speaker.local' },
+    { ip: '10.10.3.20', hostname: 'alexa-echo.local', bytes: 221234, label: '10.10.3.20 - alexa-echo.local' },
+    { ip: '10.10.3.30', hostname: 'smart-thermostat.local', bytes: 181234, label: '10.10.3.30 - smart-thermostat.local' },
+    { ip: '10.10.3.40', hostname: 'ring-doorbell.local', bytes: 151234, label: '10.10.3.40 - ring-doorbell.local' },
+    { ip: '10.10.3.50', hostname: 'hue-bridge.local', bytes: 121234, label: '10.10.3.50 - hue-bridge.local' },
   ];
 
   return (
@@ -186,11 +201,11 @@ export default function Traffic() {
           {/* Top Talkers Tab */}
           <TabPanel value={tabValue} index={2}>
             <Typography variant="h6" gutterBottom>Top Bandwidth Consumers</Typography>
-            <ResponsiveContainer width="100%" height={400}>
+            <ResponsiveContainer width="100%" height={600}>
               <BarChart data={topTalkers} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" stroke="#dee2e6" />
                 <XAxis type="number" stroke="#495057" style={{ fontSize: 12 }} />
-                <YAxis dataKey="name" type="category" stroke="#495057" style={{ fontSize: 12 }} width={120} />
+                <YAxis dataKey="label" type="category" stroke="#495057" style={{ fontSize: 11 }} width={250} />
                 <Tooltip
                   contentStyle={{
                     backgroundColor: '#ffffff',

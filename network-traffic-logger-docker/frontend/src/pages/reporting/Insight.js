@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Box,
   Card,
@@ -17,7 +17,7 @@ import {
   Chip,
 } from '@mui/material';
 import { Insights as InsightsIcon, TrendingUp, TrendingDown, Warning, CheckCircle } from '@mui/icons-material';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell } from 'recharts';
 
 function TabPanel({ children, value, index }) {
   return (
@@ -69,6 +69,23 @@ export default function Insight() {
     { device: '10.10.1.30', issue: 'High bandwidth usage', severity: 'medium', status: 'active' },
     { device: '10.10.1.45', issue: 'Port scan detected', severity: 'high', status: 'investigating' },
     { device: '10.10.1.12', issue: 'DNS query spike', severity: 'low', status: 'resolved' },
+  ];
+
+  const trafficPrediction = [
+    { hour: '00:00', predicted: 120, actual: 115 },
+    { hour: '04:00', predicted: 80, actual: 85 },
+    { hour: '08:00', predicted: 250, actual: 245 },
+    { hour: '12:00', predicted: 400, actual: 420 },
+    { hour: '16:00', predicted: 350, actual: 340 },
+    { hour: '20:00', predicted: 500, actual: 510 },
+    { hour: '23:59', predicted: 300, actual: 295 },
+  ];
+
+  const deviceCategories = [
+    { name: 'Desktop/Laptop', count: 12, color: '#d94f00' },
+    { name: 'Mobile', count: 18, color: '#17a2b8' },
+    { name: 'IoT', count: 8, color: '#28a745' },
+    { name: 'Server', count: 4, color: '#ffc107' },
   ];
 
   const getSeverityColor = (severity) => {
@@ -270,7 +287,72 @@ export default function Insight() {
 
           {/* Predictions Tab */}
           <TabPanel value={tabValue} index={3}>
-            <Typography color="text.secondary">AI-powered Network Predictions - Coming soon...</Typography>
+            <Grid container spacing={3}>
+              <Grid item xs={12}>
+                <Typography variant="h6" gutterBottom>Traffic Prediction vs Actual</Typography>
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={trafficPrediction}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#dee2e6" />
+                    <XAxis dataKey="hour" stroke="#495057" style={{ fontSize: 12 }} />
+                    <YAxis stroke="#495057" style={{ fontSize: 12 }} label={{ value: 'Mbps', angle: -90, position: 'insideLeft', style: { fill: '#495057' } }} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: '#ffffff',
+                        border: '1px solid #dee2e6',
+                        borderRadius: 3,
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                      }}
+                    />
+                    <Legend />
+                    <Line type="monotone" dataKey="predicted" stroke="#d94f00" strokeWidth={2} strokeDasharray="5 5" name="Predicted" />
+                    <Line type="monotone" dataKey="actual" stroke="#17a2b8" strokeWidth={2} name="Actual" />
+                  </LineChart>
+                </ResponsiveContainer>
+              </Grid>
+
+              <Grid item xs={12} md={6}>
+                <Typography variant="h6" gutterBottom>Device Categories</Typography>
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={deviceCategories}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={100}
+                      paddingAngle={5}
+                      dataKey="count"
+                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                    >
+                      {deviceCategories.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </Grid>
+
+              <Grid item xs={12} md={6}>
+                <Typography variant="h6" gutterBottom>Prediction Accuracy</Typography>
+                <Card variant="outlined">
+                  <CardContent>
+                    <Typography variant="h3" sx={{ fontWeight: 600, color: '#28a745', textAlign: 'center' }}>
+                      94.2%
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', mt: 1 }}>
+                      Average prediction accuracy over the last 7 days
+                    </Typography>
+                    <Box sx={{ mt: 3 }}>
+                      <Typography variant="subtitle2" color="text.secondary">Prediction Model</Typography>
+                      <Typography variant="body2">Time-series analysis (ARIMA)</Typography>
+                      <Typography variant="subtitle2" color="text.secondary" sx={{ mt: 2 }}>Last Updated</Typography>
+                      <Typography variant="body2">2 minutes ago</Typography>
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+            </Grid>
           </TabPanel>
         </CardContent>
       </Card>

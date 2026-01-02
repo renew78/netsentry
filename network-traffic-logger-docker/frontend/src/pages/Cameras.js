@@ -17,7 +17,6 @@ import {
   Videocam as VideocamIcon,
   Refresh as RefreshIcon,
   Close as CloseIcon,
-  Fullscreen as FullscreenIcon,
 } from '@mui/icons-material';
 import axios from 'axios';
 
@@ -203,29 +202,15 @@ function CameraCard({ camera, onClick, refreshKey }) {
               {camera.host}
             </Typography>
           </Box>
-          <IconButton
-            sx={{
-              position: 'absolute',
-              top: '50%',
-              left: '50%',
-              transform: 'translate(-50%, -50%)',
-              backgroundColor: 'rgba(0, 212, 255, 0.2)',
-              backdropFilter: 'blur(10px)',
-              zIndex: 1,
-              '&:hover': {
-                backgroundColor: 'rgba(0, 212, 255, 0.4)',
-              }
-            }}
-          >
-            <FullscreenIcon fontSize="large" sx={{ color: 'white' }} />
-          </IconButton>
         </Box>
       </CardContent>
     </Card>
   );
 }
 
-// Camera Stream Component (using snapshot refresh)
+// Camera Stream Component
+// TODO: Implement true RTSP stream using HLS/WebRTC conversion or JSMpeg
+// For now, using snapshot refresh as interim solution
 function CameraStream({ camera, large = false, refreshKey }) {
   const [imageKey, setImageKey] = useState(0);
   const [error, setError] = useState(false);
@@ -233,6 +218,7 @@ function CameraStream({ camera, large = false, refreshKey }) {
 
   useEffect(() => {
     // Refresh snapshot every 1 second for live effect
+    // TODO: Replace with actual RTSP stream when backend supports HLS/WebRTC
     intervalRef.current = setInterval(() => {
       setImageKey(prev => prev + 1);
     }, 1000);
