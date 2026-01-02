@@ -66,7 +66,6 @@ const menuStructure = [
     enabledKey: 'opnsense',
     submenu: [
       { text: 'Overview', path: '/opnsense/overview' },
-      { text: 'Firewall', path: '/opnsense/firewall' },
       { text: 'Settings', icon: <SettingsIcon />, path: '/opnsense/settings' },
     ]
   },

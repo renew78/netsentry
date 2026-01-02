@@ -18,6 +18,9 @@ import {
   IconButton,
   Tooltip,
   Alert,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -26,6 +29,7 @@ import {
   TrendingDown,
   SwapHoriz,
   Refresh as RefreshIcon,
+  ExpandMore as ExpandMoreIcon,
 } from '@mui/icons-material';
 import axios from 'axios';
 
@@ -158,6 +162,69 @@ export default function Devices() {
     return vlans[vlanId] || `VLAN ${vlanId}`;
   };
 
+  // Group devices by VLAN based on subnet matching
+  const groupDevicesByVlan = () => {
+    const grouped = {};
+
+    // Get VLAN configurations from settings
+    const vlanConfigs = Object.keys(vlans).map(id => ({
+      id,
+      name: vlans[id],
+      subnet: getSubnetFromVlanId(id)
+    }));
+
+    filteredDevices.forEach(device => {
+      if (!device.ip_address) {
+        // Devices without IP go to "Unknown"
+        if (!grouped['unknown']) {
+          grouped['unknown'] = { name: 'Unbekannt', devices: [] };
+        }
+        grouped['unknown'].devices.push(device);
+        return;
+      }
+
+      // Match device to VLAN by subnet
+      const subnet = device.ip_address.split('.').slice(0, 3).join('.');
+      let matched = false;
+
+      for (const vlanConfig of vlanConfigs) {
+        if (vlanConfig.subnet === subnet) {
+          if (!grouped[vlanConfig.id]) {
+            grouped[vlanConfig.id] = { name: vlanConfig.name, devices: [] };
+          }
+          grouped[vlanConfig.id].devices.push(device);
+          matched = true;
+          break;
+        }
+      }
+
+      if (!matched) {
+        // Device doesn't match any VLAN, put in "Other"
+        if (!grouped['other']) {
+          grouped['other'] = { name: 'Andere Subnetze', devices: [] };
+        }
+        grouped['other'].devices.push(device);
+      }
+    });
+
+    return grouped;
+  };
+
+  // Helper to extract subnet from VLAN ID (from settings)
+  const getSubnetFromVlanId = (vlanId) => {
+    // This should ideally come from the settings API
+    // For now, we'll use a simple mapping based on common VLAN setups
+    const subnetMap = {
+      '1': '10.10.1',
+      '2': '10.10.2',
+      '3': '10.10.3',
+      '10': '10.10.10',
+      '20': '10.10.20',
+      '30': '10.10.30',
+    };
+    return subnetMap[vlanId] || null;
+  };
+
   const handleRequestSort = (property) => {
     const isAsc = orderBy === property && order === 'asc';
     setOrder(isAsc ? 'desc' : 'asc');
@@ -169,6 +236,7 @@ export default function Devices() {
   };
 
   const sortedDevices = stableSort(filteredDevices, getComparator(order, orderBy));
+  const devicesByVlan = groupDevicesByVlan();
 
   const headCells = [
     { id: 'ip_address', label: 'IP-Adresse', sortable: true },
@@ -178,6 +246,121 @@ export default function Devices() {
     { id: 'total_traffic', label: 'Gesamt-Traffic', sortable: true, align: 'right' },
     { id: 'direction', label: 'Richtung', sortable: false },
   ];
+
+  const renderDeviceTable = (devices) => {
+    const sorted = stableSort(devices, getComparator(order, orderBy));
+
+    return (
+      <TableContainer>
+        <Table>
+          <TableHead>
+            <TableRow>
+              <TableCell padding="checkbox" />
+              {headCells.map((headCell) => (
+                <TableCell
+                  key={headCell.id}
+                  align={headCell.align || 'left'}
+                  sortDirection={orderBy === headCell.id ? order : false}
+                >
+                  {headCell.sortable ? (
+                    <TableSortLabel
+                      active={orderBy === headCell.id}
+                      direction={orderBy === headCell.id ? order : 'asc'}
+                      onClick={createSortHandler(headCell.id)}
+                    >
+                      {headCell.label}
+                    </TableSortLabel>
+                  ) : (
+                    headCell.label
+                  )}
+                </TableCell>
+              ))}
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {sorted.map((device, index) => {
+              const direction = getDirectionText(device.bytes_sent || 0, device.bytes_received || 0);
+              const vlanName = getVlanName(device.vlan_id);
+              const totalTraffic = (device.bytes_sent || 0) + (device.bytes_received || 0);
+              const currentTraffic = (device.bytes_sent_rate || 0) + (device.bytes_received_rate || 0);
+
+              return (
+                <TableRow
+                  key={device.id || index}
+                  hover
+                  sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
+                >
+                  <TableCell padding="checkbox">
+                    <ComputerIcon sx={{ color: 'primary.main' }} />
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2" sx={{ fontFamily: 'monospace', fontWeight: 600 }}>
+                      {device.ip_address || '-'}
+                    </Typography>
+                    {device.mac_address && (
+                      <Typography variant="caption" sx={{ fontFamily: 'monospace', color: 'text.secondary', display: 'block' }}>
+                        {device.mac_address}
+                      </Typography>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2">
+                      {device.hostname || '-'}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>
+                    {vlanName ? (
+                      <Chip
+                        label={vlanName}
+                        size="small"
+                        color="info"
+                        variant="outlined"
+                      />
+                    ) : (
+                      <Typography variant="body2" color="text.disabled">-</Typography>
+                    )}
+                  </TableCell>
+                  <TableCell align="right">
+                    <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                      {formatBytesPerSec(currentTraffic)}
+                    </Typography>
+                    {currentTraffic > 0 && (
+                      <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 0.5, mt: 0.5 }}>
+                        <Chip label={`↑ ${formatBytesPerSec(device.bytes_sent_rate || 0)}`} size="small" variant="outlined" sx={{ fontSize: '0.7rem', height: 18 }} />
+                        <Chip label={`↓ ${formatBytesPerSec(device.bytes_received_rate || 0)}`} size="small" variant="outlined" sx={{ fontSize: '0.7rem', height: 18 }} />
+                      </Box>
+                    )}
+                  </TableCell>
+                  <TableCell align="right">
+                    <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                      {formatBytes(totalTraffic)}
+                    </Typography>
+                    {totalTraffic > 0 && (
+                      <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 0.5, mt: 0.5 }}>
+                        <Chip label={`↑ ${formatBytes(device.bytes_sent || 0)}`} size="small" variant="outlined" sx={{ fontSize: '0.7rem', height: 18 }} />
+                        <Chip label={`↓ ${formatBytes(device.bytes_received || 0)}`} size="small" variant="outlined" sx={{ fontSize: '0.7rem', height: 18 }} />
+                      </Box>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      {getDirectionIcon(device.bytes_sent || 0, device.bytes_received || 0)}
+                      <Chip
+                        label={direction.text}
+                        size="small"
+                        color={direction.color}
+                        variant="outlined"
+                      />
+                    </Box>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </TableContainer>
+    );
+  };
 
   return (
     <Box>
@@ -221,132 +404,53 @@ export default function Devices() {
 
       {loading && <LinearProgress sx={{ mb: 2 }} />}
 
-      <Card>
-        <TableContainer>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell padding="checkbox" />
-                {headCells.map((headCell) => (
-                  <TableCell
-                    key={headCell.id}
-                    align={headCell.align || 'left'}
-                    sortDirection={orderBy === headCell.id ? order : false}
-                  >
-                    {headCell.sortable ? (
-                      <TableSortLabel
-                        active={orderBy === headCell.id}
-                        direction={orderBy === headCell.id ? order : 'asc'}
-                        onClick={createSortHandler(headCell.id)}
-                      >
-                        {headCell.label}
-                      </TableSortLabel>
-                    ) : (
-                      headCell.label
-                    )}
-                  </TableCell>
-                ))}
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {sortedDevices.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} align="center">
-                    <Box sx={{ py: 4 }}>
-                      <ComputerIcon sx={{ fontSize: 64, color: 'text.disabled', mb: 2 }} />
-                      <Typography variant="h6" color="text.secondary">
-                        Keine Geräte gefunden
-                      </Typography>
-                      <Typography variant="body2" color="text.disabled">
-                        {searchTerm ? 'Versuchen Sie eine andere Suchanfrage' : 'OPNsense Integration aktivieren und konfigurieren'}
-                      </Typography>
-                    </Box>
-                  </TableCell>
-                </TableRow>
-              ) : (
-                sortedDevices.map((device, index) => {
-                  const direction = getDirectionText(device.bytes_sent || 0, device.bytes_received || 0);
-                  const vlanName = getVlanName(device.vlan_id);
-                  const totalTraffic = (device.bytes_sent || 0) + (device.bytes_received || 0);
-                  const currentTraffic = (device.bytes_sent_rate || 0) + (device.bytes_received_rate || 0);
-
-                  return (
-                    <TableRow
-                      key={device.id || index}
-                      hover
-                      sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
-                    >
-                      <TableCell padding="checkbox">
-                        <ComputerIcon sx={{ color: 'primary.main' }} />
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2" sx={{ fontFamily: 'monospace', fontWeight: 600 }}>
-                          {device.ip_address || '-'}
-                        </Typography>
-                        {device.mac_address && (
-                          <Typography variant="caption" sx={{ fontFamily: 'monospace', color: 'text.secondary', display: 'block' }}>
-                            {device.mac_address}
-                          </Typography>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2">
-                          {device.hostname || '-'}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        {vlanName ? (
-                          <Chip
-                            label={vlanName}
-                            size="small"
-                            color="info"
-                            variant="outlined"
-                          />
-                        ) : (
-                          <Typography variant="body2" color="text.disabled">-</Typography>
-                        )}
-                      </TableCell>
-                      <TableCell align="right">
-                        <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                          {formatBytesPerSec(currentTraffic)}
-                        </Typography>
-                        {currentTraffic > 0 && (
-                          <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 0.5, mt: 0.5 }}>
-                            <Chip label={`↑ ${formatBytesPerSec(device.bytes_sent_rate || 0)}`} size="small" variant="outlined" sx={{ fontSize: '0.7rem', height: 18 }} />
-                            <Chip label={`↓ ${formatBytesPerSec(device.bytes_received_rate || 0)}`} size="small" variant="outlined" sx={{ fontSize: '0.7rem', height: 18 }} />
-                          </Box>
-                        )}
-                      </TableCell>
-                      <TableCell align="right">
-                        <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                          {formatBytes(totalTraffic)}
-                        </Typography>
-                        {totalTraffic > 0 && (
-                          <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 0.5, mt: 0.5 }}>
-                            <Chip label={`↑ ${formatBytes(device.bytes_sent || 0)}`} size="small" variant="outlined" sx={{ fontSize: '0.7rem', height: 18 }} />
-                            <Chip label={`↓ ${formatBytes(device.bytes_received || 0)}`} size="small" variant="outlined" sx={{ fontSize: '0.7rem', height: 18 }} />
-                          </Box>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          {getDirectionIcon(device.bytes_sent || 0, device.bytes_received || 0)}
-                          <Chip
-                            label={direction.text}
-                            size="small"
-                            color={direction.color}
-                            variant="outlined"
-                          />
-                        </Box>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </Card>
+      {sortedDevices.length === 0 ? (
+        <Card>
+          <CardContent>
+            <Box sx={{ py: 4, textAlign: 'center' }}>
+              <ComputerIcon sx={{ fontSize: 64, color: 'text.disabled', mb: 2 }} />
+              <Typography variant="h6" color="text.secondary">
+                Keine Geräte gefunden
+              </Typography>
+              <Typography variant="body2" color="text.disabled">
+                {searchTerm ? 'Versuchen Sie eine andere Suchanfrage' : 'OPNsense Integration aktivieren und konfigurieren'}
+              </Typography>
+            </Box>
+          </CardContent>
+        </Card>
+      ) : (
+        <Box>
+          {Object.entries(devicesByVlan).map(([vlanId, vlanGroup]) => (
+            <Accordion key={vlanId} defaultExpanded sx={{ mb: 2 }}>
+              <AccordionSummary
+                expandIcon={<ExpandMoreIcon />}
+                sx={{
+                  backgroundColor: 'rgba(217, 79, 0, 0.05)',
+                  '&:hover': {
+                    backgroundColor: 'rgba(217, 79, 0, 0.1)',
+                  },
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%' }}>
+                  <ComputerIcon sx={{ color: 'primary.main' }} />
+                  <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                    {vlanGroup.name}
+                  </Typography>
+                  <Chip
+                    label={`${vlanGroup.devices.length} Gerät(e)`}
+                    size="small"
+                    color="primary"
+                    sx={{ ml: 'auto', mr: 2 }}
+                  />
+                </Box>
+              </AccordionSummary>
+              <AccordionDetails sx={{ p: 0 }}>
+                {renderDeviceTable(vlanGroup.devices)}
+              </AccordionDetails>
+            </Accordion>
+          ))}
+        </Box>
+      )}
 
       <Box sx={{ mt: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Typography variant="body2" color="text.secondary">
