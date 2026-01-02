@@ -8,6 +8,7 @@ import os
 import json
 import asyncio
 import aiohttp
+import ssl
 import base64
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
@@ -22,8 +23,45 @@ from influxdb_client.client.influxdb_client_async import InfluxDBClientAsync
 from motor.motor_asyncio import AsyncIOMotorClient
 from bson import ObjectId
 
-# Import models
-from models import Camera, CameraCreate, CameraUpdate
+# Camera Models
+class Camera(BaseModel):
+    """Camera configuration model"""
+    id: Optional[str] = Field(None, alias="_id")
+    name: str = Field(..., min_length=1, max_length=100)
+    host: str = Field(..., description="IP address or hostname of the camera")
+    port: int = Field(default=554, ge=1, le=65535)
+    username: str = Field(..., min_length=1)
+    password: str = Field(..., min_length=1)
+    rtsp_path: str = Field(default="/h264Preview_01_main", description="RTSP path for main stream")
+    sub_stream_path: str = Field(default="/h264Preview_01_sub", description="RTSP path for sub stream")
+    enabled: bool = Field(default=True)
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        populate_by_name = True
+
+class CameraCreate(BaseModel):
+    """Model for creating a new camera"""
+    name: str = Field(..., min_length=1, max_length=100)
+    host: str
+    port: int = Field(default=554, ge=1, le=65535)
+    username: str
+    password: str
+    rtsp_path: str = Field(default="/h264Preview_01_main")
+    sub_stream_path: str = Field(default="/h264Preview_01_sub")
+    enabled: bool = Field(default=True)
+
+class CameraUpdate(BaseModel):
+    """Model for updating an existing camera"""
+    name: Optional[str] = Field(None, min_length=1, max_length=100)
+    host: Optional[str] = None
+    port: Optional[int] = Field(None, ge=1, le=65535)
+    username: Optional[str] = None
+    password: Optional[str] = None
+    rtsp_path: Optional[str] = None
+    sub_stream_path: Optional[str] = None
+    enabled: Optional[bool] = None
 
 # Configuration
 MONGO_URL = os.getenv('MONGO_URL', 'mongodb://admin:password@mongodb:27017')
@@ -816,21 +854,43 @@ async def get_camera_snapshot(camera_id: str):
         if not camera:
             raise HTTPException(status_code=404, detail="Camera not found")
 
-        # Reolink snapshot URL format
-        snapshot_url = f"http://{camera['host']}:{camera.get('port', 80)}/cgi-bin/api.cgi?cmd=Snap&channel=0&rs=snapshot&user={camera['username']}&password={camera['password']}"
+        # Reolink uses HTTPS and redirects from HTTP
+        # Use HTTPS directly and disable SSL verification (self-signed cert)
+        snapshot_url = f"https://{camera['host']}/cgi-bin/api.cgi?cmd=Snap&channel=0&rs=snapshot&user={camera['username']}&password={camera['password']}"
 
-        async with aiohttp.ClientSession() as session:
+        print(f"[Camera] Fetching snapshot from: {snapshot_url.replace(camera['password'], '***')}")
+
+        # Create SSL context that accepts all certificates and protocols (for older cameras)
+        ssl_context = ssl.create_default_context()
+        ssl_context.check_hostname = False
+        ssl_context.verify_mode = ssl.CERT_NONE
+        # Allow older SSL/TLS versions for compatibility with older Reolink cameras
+        ssl_context.minimum_version = ssl.TLSVersion.MINIMUM_SUPPORTED
+        ssl_context.set_ciphers('DEFAULT@SECLEVEL=1')
+
+        # Create connector with permissive SSL context
+        connector = aiohttp.TCPConnector(ssl=ssl_context)
+        async with aiohttp.ClientSession(connector=connector) as session:
             async with session.get(snapshot_url, timeout=aiohttp.ClientTimeout(total=10)) as response:
+                print(f"[Camera] Snapshot response status: {response.status}")
                 if response.status == 200:
                     image_data = await response.read()
+                    print(f"[Camera] Snapshot received: {len(image_data)} bytes")
                     return Response(content=image_data, media_type="image/jpeg")
                 else:
-                    raise HTTPException(status_code=500, detail="Failed to get snapshot from camera")
+                    error_body = await response.text()
+                    print(f"[Camera] Snapshot failed: {response.status} - {error_body}")
+                    raise HTTPException(status_code=500, detail=f"Camera returned {response.status}: {error_body[:100]}")
+    except HTTPException:
+        raise
     except Exception as e:
+        print(f"[Camera] Snapshot exception: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Snapshot failed: {str(e)}")
 
 @app.get("/api/cameras/{camera_id}/stream")
-async def get_camera_stream_url(camera_id: str, quality: str = Query("main", regex="^(main|sub)$")):
+async def get_camera_stream_url(camera_id: str, quality: str = Query("main", pattern="^(main|sub)$")):
     """Get the RTSP stream URL for a camera"""
     try:
         camera = await db.cameras.find_one({"_id": ObjectId(camera_id)})
