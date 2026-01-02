@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Box,
   Card,
@@ -17,7 +17,7 @@ import {
   Chip,
 } from '@mui/material';
 import { Insights as InsightsIcon, TrendingUp, TrendingDown, Warning, CheckCircle } from '@mui/icons-material';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell, BarChart, Bar } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell } from 'recharts';
 
 function TabPanel({ children, value, index }) {
   return (

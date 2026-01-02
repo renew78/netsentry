@@ -33,7 +33,6 @@ import {
   Edit as EditIcon,
   Save as SaveIcon,
   Shield as ShieldIcon,
-  Dns as DnsIcon,
   Security as SecurityIcon,
   NetworkCheck as NetworkCheckIcon,
   Storage as StorageIcon,
