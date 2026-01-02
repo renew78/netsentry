@@ -186,7 +186,6 @@ export default function Settings() {
           sx={{ borderBottom: 1, borderColor: 'divider' }}
         >
           <Tab icon={<NetworkCheckIcon />} label="VLANs" />
-          <Tab icon={<DnsIcon />} label="AdGuard" />
           <Tab icon={<SecurityIcon />} label="OPNsense" />
           <Tab icon={<StorageIcon />} label="TrueNAS" />
           <Tab icon={<VideocamIcon />} label="Kameras" />
@@ -262,67 +261,8 @@ export default function Settings() {
             </TableContainer>
           </TabPanel>
 
-          {/* AdGuard Configuration */}
-          <TabPanel value={tabValue} index={1}>
-            <Typography variant="h6" gutterBottom>
-              AdGuard Home Integration
-            </Typography>
-            <Alert severity="info" sx={{ mb: 3 }}>
-              Verbinden Sie NetSentry mit Ihrem AdGuard Home Server, um DNS-Statistiken anzuzeigen.
-            </Alert>
-            <Grid container spacing={3}>
-              <Grid item xs={12}>
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={settings.adguard.enabled}
-                      onChange={(e) =>
-                        setSettings({
-                          ...settings,
-                          adguard: { ...settings.adguard, enabled: e.target.checked },
-                        })
-                      }
-                    />
-                  }
-                  label="AdGuard Integration aktivieren"
-                />
-              </Grid>
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="AdGuard URL"
-                  placeholder="http://10.10.1.10:3000"
-                  value={settings.adguard.url}
-                  onChange={(e) =>
-                    setSettings({
-                      ...settings,
-                      adguard: { ...settings.adguard, url: e.target.value },
-                    })
-                  }
-                  disabled={!settings.adguard.enabled}
-                />
-              </Grid>
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="API Key"
-                  type="password"
-                  value={settings.adguard.apiKey}
-                  onChange={(e) =>
-                    setSettings({
-                      ...settings,
-                      adguard: { ...settings.adguard, apiKey: e.target.value },
-                    })
-                  }
-                  disabled={!settings.adguard.enabled}
-                  helperText="Sie finden den API Key in den AdGuard Einstellungen unter 'Allgemeine Einstellungen'"
-                />
-              </Grid>
-            </Grid>
-          </TabPanel>
-
           {/* OPNsense Configuration */}
-          <TabPanel value={tabValue} index={2}>
+          <TabPanel value={tabValue} index={1}>
             <Typography variant="h6" gutterBottom>
               OPNsense Firewall Integration
             </Typography>
@@ -493,7 +433,7 @@ export default function Settings() {
           </TabPanel>
 
           {/* TrueNAS Configuration */}
-          <TabPanel value={tabValue} index={3}>
+          <TabPanel value={tabValue} index={2}>
             <Typography variant="h6" gutterBottom>
               TrueNAS Scale Integration
             </Typography>
@@ -555,7 +495,7 @@ export default function Settings() {
           <CameraSettings tabValue={tabValue} />
 
           {/* Advanced Settings */}
-          <TabPanel value={tabValue} index={5}>
+          <TabPanel value={tabValue} index={4}>
             <Typography variant="h6" gutterBottom>
               Erweiterte Einstellungen
             </Typography>
@@ -739,7 +679,7 @@ function CameraSettings({ tabValue }) {
   };
 
   return (
-    <TabPanel value={tabValue} index={4}>
+    <TabPanel value={tabValue} index={3}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
         <Typography variant="h6">Kamera-Konfiguration</Typography>
         <Button

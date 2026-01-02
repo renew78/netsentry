@@ -76,7 +76,6 @@ const menuStructure = [
     enabledKey: 'truenas',
     submenu: [
       { text: 'Storage', path: '/truenas/storage' },
-      { text: 'System', path: '/truenas/system' },
       { text: 'Settings', icon: <SettingsIcon />, path: '/truenas/settings' },
     ]
   },

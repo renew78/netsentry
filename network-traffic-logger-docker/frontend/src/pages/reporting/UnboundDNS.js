@@ -29,12 +29,44 @@ export default function UnboundDNS() {
     { name: 'Cached', value: 8521, color: '#17a2b8' },
   ];
 
+  const queryTypes = [
+    { type: 'A', count: 8521, color: '#d94f00' },
+    { type: 'AAAA', count: 3214, color: '#17a2b8' },
+    { type: 'PTR', count: 1523, color: '#28a745' },
+    { type: 'MX', count: 892, color: '#ffc107' },
+    { type: 'TXT', count: 456, color: '#dc3545' },
+    { type: 'CNAME', count: 234, color: '#6c757d' },
+  ];
+
   const topDomains = [
-    { domain: 'google.com', queries: 1234 },
-    { domain: 'cloudflare.com', queries: 892 },
-    { domain: 'github.com', queries: 567 },
-    { domain: 'amazon.com', queries: 445 },
-    { domain: 'facebook.com', queries: 321 },
+    { domain: 'google.com', queries: 4521 },
+    { domain: 'youtube.com', queries: 3210 },
+    { domain: 'facebook.com', queries: 2105 },
+    { domain: 'amazon.com', queries: 1850 },
+    { domain: 'twitter.com', queries: 1420 },
+    { domain: 'instagram.com', queries: 1234 },
+    { domain: 'reddit.com', queries: 1123 },
+    { domain: 'netflix.com', queries: 1001 },
+    { domain: 'github.com', queries: 892 },
+    { domain: 'cloudflare.com', queries: 845 },
+    { domain: 'apple.com', queries: 789 },
+    { domain: 'microsoft.com', queries: 734 },
+    { domain: 'linkedin.com', queries: 678 },
+    { domain: 'stackoverflow.com', queries: 623 },
+    { domain: 'wikipedia.org', queries: 567 },
+    { domain: 'twitch.tv', queries: 512 },
+    { domain: 'spotify.com', queries: 489 },
+    { domain: 'discord.com', queries: 445 },
+    { domain: 'zoom.us', queries: 398 },
+    { domain: 'dropbox.com', queries: 321 },
+  ];
+
+  const blocklist = [
+    { domain: 'ads.doubleclick.net', blocked: 1523, color: '#dc3545' },
+    { domain: 'tracker.facebook.com', blocked: 892, color: '#dc3545' },
+    { domain: 'analytics.google.com', blocked: 756, color: '#dc3545' },
+    { domain: 'ad.atdmt.com', blocked: 645, color: '#dc3545' },
+    { domain: 'pixel.facebook.com', blocked: 534, color: '#dc3545' },
   ];
 
   return (
@@ -127,13 +159,74 @@ export default function UnboundDNS() {
             </ResponsiveContainer>
           </TabPanel>
 
-          {/* Placeholder tabs */}
+          {/* Query Types Tab */}
           <TabPanel value={tabValue} index={1}>
-            <Typography color="text.secondary">Query Types - Coming soon...</Typography>
+            <Grid container spacing={3}>
+              <Grid item xs={12} md={6}>
+                <Typography variant="h6" gutterBottom>Query Type Distribution</Typography>
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={queryTypes}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={100}
+                      paddingAngle={5}
+                      dataKey="count"
+                      label={({ type, percent }) => `${type}: ${(percent * 100).toFixed(0)}%`}
+                    >
+                      {queryTypes.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <Typography variant="h6" gutterBottom>Query Types</Typography>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={queryTypes}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#dee2e6" />
+                    <XAxis dataKey="type" stroke="#495057" style={{ fontSize: 12 }} />
+                    <YAxis stroke="#495057" style={{ fontSize: 12 }} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: '#ffffff',
+                        border: '1px solid #dee2e6',
+                        borderRadius: 3,
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                      }}
+                    />
+                    <Legend />
+                    <Bar dataKey="count" fill="#d94f00" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </Grid>
+            </Grid>
           </TabPanel>
 
+          {/* Blocklist Tab */}
           <TabPanel value={tabValue} index={3}>
-            <Typography color="text.secondary">Blocklist Statistics - Coming soon...</Typography>
+            <Typography variant="h6" gutterBottom>Top Blocked Domains</Typography>
+            <ResponsiveContainer width="100%" height={400}>
+              <BarChart data={blocklist} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" stroke="#dee2e6" />
+                <XAxis type="number" stroke="#495057" style={{ fontSize: 12 }} />
+                <YAxis dataKey="domain" type="category" stroke="#495057" style={{ fontSize: 12 }} width={200} />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: '#ffffff',
+                    border: '1px solid #dee2e6',
+                    borderRadius: 3,
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                  }}
+                />
+                <Legend />
+                <Bar dataKey="blocked" fill="#dc3545" />
+              </BarChart>
+            </ResponsiveContainer>
           </TabPanel>
         </CardContent>
       </Card>

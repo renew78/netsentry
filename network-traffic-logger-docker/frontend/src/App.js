@@ -249,7 +249,6 @@ function App() {
 
             {/* TrueNAS Routes */}
             <Route path="/truenas/storage" element={<TrueNAS />} />
-            <Route path="/truenas/system" element={<TrueNAS />} />
             <Route path="/truenas/settings" element={<TrueNASSettings />} />
 
             {/* Camera Routes */}
