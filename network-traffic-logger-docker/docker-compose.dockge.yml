@@ -85,7 +85,7 @@ services:
   # Backend API
   backend:
     build:
-      context: https://github.com/renew78/ansible.git#claude/network-traffic-logger-NeLSQ
+      context: https://github.com/renew78/netsentry.git#main
       dockerfile: network-traffic-logger-docker/backend/Dockerfile
     container_name: netsentry_backend
     restart: unless-stopped
@@ -111,7 +111,7 @@ services:
   # Frontend
   frontend:
     build:
-      context: https://github.com/renew78/ansible.git#claude/network-traffic-logger-NeLSQ
+      context: https://github.com/renew78/netsentry.git#main
       dockerfile: network-traffic-logger-docker/frontend/Dockerfile
     container_name: netsentry_frontend
     restart: unless-stopped

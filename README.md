@@ -66,8 +66,8 @@ Umfassende Netzwerk-Traffic-Monitoring-Lösung für OPNsense und TP-Link Switche
 ### 1. Repository klonen
 
 ```bash
-git clone https://github.com/renew78/ansible.git
-cd ansible
+git clone https://github.com/renew78/netsentry.git
+cd netsentry
 ```
 
 ### 2. Konfiguration anpassen
@@ -263,7 +263,7 @@ snmpwalk -v2c -c public <SWITCH_IP> system
 
 ```bash
 # Git Repository aktualisieren
-cd ~/ansible
+cd ~/netsentry
 git pull
 
 # Deployment erneut ausführen
@@ -382,7 +382,7 @@ Siehe [network-traffic-logger-docker/README.md](network-traffic-logger-docker/RE
 Bei Fragen oder Problemen:
 - Prüfen Sie die Logs: `docker-compose logs`
 - Konsultieren Sie die detaillierte Dokumentation: `roles/network_traffic_logger/README.md`
-- Erstellen Sie ein Issue im Repository: https://github.com/renew78/ansible/issues
+- Erstellen Sie ein Issue im Repository: https://github.com/renew78/netsentry/issues
 
 ## 📄 Lizenz
 

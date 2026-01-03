@@ -35,8 +35,8 @@ newgrp docker
 ```bash
 # Auf Ihrem Raspberry Pi:
 cd ~
-git clone https://github.com/renew78/ansible.git
-cd ansible/network-traffic-logger-docker
+git clone https://github.com/renew78/netsentry.git
+cd netsentry/network-traffic-logger-docker
 ```
 
 Oder Dateien manuell kopieren, falls Git nicht verfügbar ist.
@@ -299,7 +299,7 @@ So aktualisieren Sie die Anwendung:
 
 ```bash
 # Git-Repository aktualisieren
-cd ~/ansible/network-traffic-logger-docker
+cd ~/netsentry/network-traffic-logger-docker
 git pull
 
 # Container neu bauen

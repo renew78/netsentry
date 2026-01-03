@@ -207,5 +207,5 @@ The following volumes persist data across container restarts:
 ## Support
 
 For issues, feature requests, or questions:
-- GitHub: https://github.com/renew78/ansible/issues
+- GitHub: https://github.com/renew78/netsentry/issues
 - Docker Hub: https://hub.docker.com/u/renew78
