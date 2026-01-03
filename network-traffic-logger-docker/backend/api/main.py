@@ -599,6 +599,185 @@ async def get_opnsense_traffic():
             })
         return traffic_data
 
+@app.get("/api/opnsense/unbound/stats")
+async def get_opnsense_unbound_stats():
+    """Get Unbound DNS statistics from OPNsense including blocklist data"""
+    try:
+        print(f"[OPNsense] Fetching Unbound DNS statistics")
+
+        # Parse and format the data for frontend
+        response_data = {
+            "queryStats": [],
+            "queryTypes": [],
+            "topDomains": [],
+            "blocklist": []
+        }
+
+        # Try multiple possible API endpoints for Unbound statistics
+        # Different OPNsense versions may use different endpoints
+
+        # Method 1: Try /unbound/diagnostics/stats (standard stats endpoint)
+        stats_result = await opnsense_api_call('/unbound/diagnostics/stats')
+        print(f"[OPNsense] /unbound/diagnostics/stats result: {type(stats_result)}")
+
+        # Method 2: Try /unbound/service/dnsbl for DNSBL blocklist data
+        dnsbl_result = await opnsense_api_call('/unbound/service/dnsbl')
+        print(f"[OPNsense] /unbound/service/dnsbl result: {type(dnsbl_result)}")
+
+        # Method 3: Try /unbound/diagnostics/listInsecure for query log (might contain domains)
+        query_log = await opnsense_api_call('/unbound/diagnostics/listInsecure')
+        print(f"[OPNsense] /unbound/diagnostics/listInsecure result: {type(query_log)}")
+
+        # Method 4: Try alternative stats endpoint
+        alt_stats = await opnsense_api_call('/unbound/service/stats')
+        print(f"[OPNsense] /unbound/service/stats result: {type(alt_stats)}")
+
+        # Process general stats
+        stats_to_parse = stats_result or alt_stats
+        if stats_to_parse and isinstance(stats_to_parse, dict):
+            print(f"[OPNsense] Processing stats with keys: {list(stats_to_parse.keys())[:10]}")
+
+            # Extract query statistics (Unbound uses dot notation keys)
+            total_queries = 0
+            total_cachehits = 0
+
+            # Try different possible key formats
+            for key in stats_to_parse.keys():
+                if 'num.queries' in key.lower() or 'total.num.queries' in key:
+                    total_queries = int(stats_to_parse.get(key, 0))
+                if 'cachehits' in key.lower() or 'num.cachehits' in key:
+                    total_cachehits = int(stats_to_parse.get(key, 0))
+
+            # Calculate resolved (non-cached) queries
+            resolved = max(0, total_queries - total_cachehits)
+
+            response_data["queryStats"] = [
+                {"name": "Resolved", "value": resolved, "color": "#28a745"},
+                {"name": "Blocked", "value": 0, "color": "#dc3545"},  # Will be updated from DNSBL
+                {"name": "Cached", "value": total_cachehits, "color": "#17a2b8"}
+            ]
+
+            # Extract query types
+            query_types_map = {}
+            for key, value in stats_to_parse.items():
+                # Look for query type statistics (e.g., "num.query.type.A", "type.A", etc.)
+                if 'query.type.' in key or 'num.type.' in key:
+                    qtype = key.split('.')[-1].upper()  # Get the type (A, AAAA, etc.)
+                    if qtype and isinstance(value, (int, str)):
+                        try:
+                            query_types_map[qtype] = int(value)
+                        except (ValueError, TypeError):
+                            pass
+
+            if query_types_map:
+                colors = ['#d94f00', '#17a2b8', '#28a745', '#ffc107', '#dc3545', '#6c757d']
+                response_data["queryTypes"] = [
+                    {"type": qtype, "count": count, "color": colors[i % len(colors)]}
+                    for i, (qtype, count) in enumerate(sorted(query_types_map.items(), key=lambda x: x[1], reverse=True))
+                    if count > 0
+                ]
+
+        # Process DNSBL (blocklist) data
+        dnsbl_to_parse = dnsbl_result
+        if dnsbl_to_parse and isinstance(dnsbl_to_parse, dict):
+            print(f"[OPNsense] Processing DNSBL with keys: {list(dnsbl_to_parse.keys())}")
+
+            blocklist_data = []
+
+            # Try different possible structures
+            # Option 1: Direct 'blocked' key with domain:count pairs
+            if 'blocked' in dnsbl_to_parse and isinstance(dnsbl_to_parse['blocked'], dict):
+                for domain, count in dnsbl_to_parse['blocked'].items():
+                    if isinstance(count, (int, str)):
+                        try:
+                            blocklist_data.append({
+                                "domain": str(domain),
+                                "blocked": int(count),
+                                "color": "#dc3545"
+                            })
+                        except (ValueError, TypeError):
+                            pass
+
+            # Option 2: 'rows' array structure
+            elif 'rows' in dnsbl_to_parse and isinstance(dnsbl_to_parse['rows'], list):
+                for row in dnsbl_to_parse['rows']:
+                    if isinstance(row, dict):
+                        domain = row.get('domain', row.get('name', ''))
+                        count = row.get('count', row.get('blocked', row.get('hits', 0)))
+                        if domain:
+                            try:
+                                blocklist_data.append({
+                                    "domain": str(domain),
+                                    "blocked": int(count),
+                                    "color": "#dc3545"
+                                })
+                            except (ValueError, TypeError):
+                                pass
+
+            # Option 3: Direct key-value pairs in the root
+            else:
+                for key, value in dnsbl_to_parse.items():
+                    if isinstance(value, (int, str)) and not key.startswith('_'):
+                        try:
+                            count = int(value)
+                            if count > 0:
+                                blocklist_data.append({
+                                    "domain": str(key),
+                                    "blocked": count,
+                                    "color": "#dc3545"
+                                })
+                        except (ValueError, TypeError):
+                            pass
+
+            if blocklist_data:
+                # Sort by count and take top 20
+                blocklist_data.sort(key=lambda x: x['blocked'], reverse=True)
+                response_data["blocklist"] = blocklist_data[:20]
+
+                # Update blocked count in queryStats
+                total_blocked = sum(item['blocked'] for item in blocklist_data)
+                for stat in response_data["queryStats"]:
+                    if stat["name"] == "Blocked":
+                        stat["value"] = total_blocked
+
+        # Process query log for top domains if available
+        if query_log and isinstance(query_log, (dict, list)):
+            domain_counts = {}
+
+            if isinstance(query_log, dict) and 'rows' in query_log:
+                for row in query_log.get('rows', [])[:100]:  # Limit to recent 100
+                    if isinstance(row, dict):
+                        domain = row.get('domain', row.get('qname', ''))
+                        if domain:
+                            domain_counts[domain] = domain_counts.get(domain, 0) + 1
+
+            if domain_counts:
+                top_domains = [
+                    {"domain": domain, "queries": count}
+                    for domain, count in sorted(domain_counts.items(), key=lambda x: x[1], reverse=True)[:20]
+                ]
+                response_data["topDomains"] = top_domains
+
+        print(f"[OPNsense] Returning Unbound stats:")
+        print(f"  - Query stats: {len(response_data['queryStats'])} entries")
+        print(f"  - Query types: {len(response_data['queryTypes'])} entries")
+        print(f"  - Top domains: {len(response_data['topDomains'])} entries")
+        print(f"  - Blocklist: {len(response_data['blocklist'])} entries")
+
+        return response_data
+
+    except Exception as e:
+        print(f"[OPNsense] Error fetching Unbound stats: {e}")
+        import traceback
+        traceback.print_exc()
+        # Return empty data structure instead of raising error (allows frontend fallback)
+        return {
+            "queryStats": [],
+            "queryTypes": [],
+            "topDomains": [],
+            "blocklist": []
+        }
+
 @app.get("/api/opnsense/test")
 async def test_opnsense_connection():
     """Test OPNsense API connection and credentials"""

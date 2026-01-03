@@ -99,10 +99,32 @@ export default function UnboundDNS() {
     try {
       // Fetch DNS statistics from OPNsense API
       const response = await axios.get(`${API_URL}/opnsense/unbound/stats`);
-      setDnsData(response.data);
+
+      // Check if we got any real data
+      const hasRealData = response.data && (
+        (response.data.queryStats && response.data.queryStats.length > 0) ||
+        (response.data.blocklist && response.data.blocklist.length > 0) ||
+        (response.data.queryTypes && response.data.queryTypes.length > 0) ||
+        (response.data.topDomains && response.data.topDomains.length > 0)
+      );
+
+      if (hasRealData) {
+        setDnsData(response.data);
+        setError(null);
+      } else {
+        // Backend returned empty data - OPNsense might not be configured
+        setError('Keine DNS-Statistiken verfügbar. Bitte stellen Sie sicher, dass:\n1. OPNsense in den Einstellungen konfiguriert ist\n2. Unbound DNS auf OPNsense aktiviert ist\n3. Die API-Credentials korrekt sind');
+        setDnsData(placeholderData);
+      }
     } catch (error) {
       console.error('Error fetching Unbound DNS data:', error);
-      setError('Fehler beim Laden der DNS-Statistiken. Verwende Platzhalter-Daten. Bitte OPNsense-Verbindung prüfen.');
+      if (error.response?.status === 500) {
+        setError('Fehler beim Abrufen der DNS-Statistiken von OPNsense. Bitte Backend-Logs prüfen.');
+      } else if (error.response?.status === 404) {
+        setError('OPNsense API-Endpoint nicht gefunden. Bitte Backend-Version prüfen.');
+      } else {
+        setError('Verbindungsfehler zu OPNsense. Bitte Netzwerk und Einstellungen prüfen.');
+      }
       // Use placeholder data as fallback
       setDnsData(placeholderData);
     } finally {
@@ -140,7 +162,7 @@ export default function UnboundDNS() {
       </Box>
 
       {error && (
-        <Alert severity="warning" sx={{ mb: 3 }}>
+        <Alert severity="warning" sx={{ mb: 3, whiteSpace: 'pre-line' }}>
           {error}
         </Alert>
       )}
