@@ -1,10 +1,10 @@
 ---
-# Ansible Inventory für Oracle Linux Server
+# Ansible Inventory für Network Traffic Logger
 all:
   children:
-    oracle_linux:
+    monitoring_servers:
       hosts:
-        tawaa:
+        netlogger:
           ansible_host: localhost
           ansible_connection: local
       vars:
