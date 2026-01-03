@@ -10,6 +10,8 @@ import asyncio
 import aiohttp
 import ssl
 import base64
+import paramiko
+import io
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 from contextlib import asynccontextmanager
@@ -255,6 +257,316 @@ async def truenas_api_call(endpoint: str):
     except Exception as e:
         print(f"TrueNAS API error: {e}")
         return None
+
+# OPNsense DuckDB SSH Helper Functions
+async def opnsense_ssh_query(query: str) -> List[Dict[str, Any]]:
+    """Execute DuckDB query on OPNsense via SSH and return results"""
+    try:
+        # OPNsense SSH configuration from environment variables
+        OPNSENSE_HOST = os.getenv('OPNSENSE_SSH_HOST', '10.10.1.1')
+        OPNSENSE_USER = os.getenv('OPNSENSE_SSH_USER', 'netsentry')
+        OPNSENSE_SSH_KEY = "/root/.ssh/id_rsa"  # SSH key path in backend container
+        DUCKDB_PATH = "/var/unbound/data/unbound.duckdb"
+
+        # Create SSH client
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+        # Connect using SSH key
+        ssh.connect(
+            hostname=OPNSENSE_HOST,
+            username=OPNSENSE_USER,
+            key_filename=OPNSENSE_SSH_KEY,
+            timeout=10
+        )
+
+        # Execute DuckDB query via SSH
+        # Using -json flag to get JSON output directly from duckdb CLI
+        duckdb_command = f"duckdb '{DUCKDB_PATH}' -json -c \"{query}\""
+        stdin, stdout, stderr = ssh.exec_command(duckdb_command)
+
+        # Get output
+        output = stdout.read().decode('utf-8')
+        error_output = stderr.read().decode('utf-8')
+
+        ssh.close()
+
+        # Check for errors
+        if error_output and "Error" in error_output:
+            print(f"[DuckDB] Query error: {error_output}")
+            return []
+
+        # Parse JSON output
+        if output.strip():
+            try:
+                results = json.loads(output)
+                return results if isinstance(results, list) else []
+            except json.JSONDecodeError as e:
+                print(f"[DuckDB] JSON parse error: {e}")
+                print(f"[DuckDB] Raw output: {output[:500]}")
+                return []
+
+        return []
+
+    except Exception as e:
+        print(f"[DuckDB] SSH query error: {type(e).__name__}: {e}")
+        import traceback
+        traceback.print_exc()
+        return []
+
+async def get_dns_blocked_domains(limit: int = 20, time_range_hours: int = 24) -> List[Dict[str, Any]]:
+    """Get top blocked domains from DuckDB"""
+    query = f"""
+        SELECT
+            domain,
+            COUNT(*) as blocked_count,
+            blocklist
+        FROM query
+        WHERE action = 'blocked'
+            AND time >= (NOW() - INTERVAL '{time_range_hours} hours')
+        GROUP BY domain, blocklist
+        ORDER BY blocked_count DESC
+        LIMIT {limit}
+    """
+
+    results = await opnsense_ssh_query(query)
+    return [
+        {
+            "domain": row["domain"],
+            "blocked": row["blocked_count"],
+            "blocklist": row["blocklist"],
+            "color": "#dc3545"
+        }
+        for row in results
+    ]
+
+async def get_dns_query_stats(time_range_hours: int = 24) -> Dict[str, Any]:
+    """Get DNS query statistics (resolved, blocked, cached)"""
+    query = f"""
+        SELECT
+            action,
+            COUNT(*) as count
+        FROM query
+        WHERE time >= (NOW() - INTERVAL '{time_range_hours} hours')
+        GROUP BY action
+    """
+
+    results = await opnsense_ssh_query(query)
+
+    # Map actions to statistics
+    stats = {
+        "resolved": 0,
+        "blocked": 0,
+        "cached": 0
+    }
+
+    for row in results:
+        action = row.get("action", "").lower()
+        count = row.get("count", 0)
+
+        if action == "resolved" or action == "ok":
+            stats["resolved"] = count
+        elif action == "blocked":
+            stats["blocked"] = count
+        elif action == "cached":
+            stats["cached"] = count
+
+    return stats
+
+async def get_dns_query_types(time_range_hours: int = 24) -> List[Dict[str, Any]]:
+    """Get DNS query type distribution"""
+    query = f"""
+        SELECT
+            type,
+            COUNT(*) as count
+        FROM query
+        WHERE time >= (NOW() - INTERVAL '{time_range_hours} hours')
+            AND type IS NOT NULL
+        GROUP BY type
+        ORDER BY count DESC
+        LIMIT 15
+    """
+
+    results = await opnsense_ssh_query(query)
+    colors = ['#d94f00', '#17a2b8', '#28a745', '#ffc107', '#dc3545', '#6c757d', '#6610f2', '#e83e8c', '#fd7e14', '#20c997']
+
+    return [
+        {
+            "type": row["type"],
+            "count": row["count"],
+            "color": colors[i % len(colors)]
+        }
+        for i, row in enumerate(results)
+    ]
+
+async def get_dns_top_domains(limit: int = 20, time_range_hours: int = 24, allowed_only: bool = True) -> List[Dict[str, Any]]:
+    """Get top queried domains"""
+    action_filter = "AND action != 'blocked'" if allowed_only else ""
+
+    query = f"""
+        SELECT
+            domain,
+            COUNT(*) as query_count
+        FROM query
+        WHERE time >= (NOW() - INTERVAL '{time_range_hours} hours')
+            AND domain IS NOT NULL
+            {action_filter}
+        GROUP BY domain
+        ORDER BY query_count DESC
+        LIMIT {limit}
+    """
+
+    results = await opnsense_ssh_query(query)
+
+    return [
+        {
+            "domain": row["domain"],
+            "queries": row["query_count"]
+        }
+        for row in results
+    ]
+
+async def get_dns_client_stats(limit: int = 20, time_range_hours: int = 24) -> List[Dict[str, Any]]:
+    """Get per-client DNS query statistics"""
+    query = f"""
+        SELECT
+            client,
+            COUNT(*) as total_queries,
+            SUM(CASE WHEN action = 'blocked' THEN 1 ELSE 0 END) as blocked_queries,
+            SUM(CASE WHEN action != 'blocked' THEN 1 ELSE 0 END) as allowed_queries
+        FROM query
+        WHERE time >= (NOW() - INTERVAL '{time_range_hours} hours')
+            AND client IS NOT NULL
+        GROUP BY client
+        ORDER BY total_queries DESC
+        LIMIT {limit}
+    """
+
+    results = await opnsense_ssh_query(query)
+
+    return [
+        {
+            "client": row["client"],
+            "total_queries": row["total_queries"],
+            "blocked": row["blocked_queries"],
+            "allowed": row["allowed_queries"],
+            "block_rate": round((row["blocked_queries"] / row["total_queries"] * 100), 2) if row["total_queries"] > 0 else 0
+        }
+        for row in results
+    ]
+
+async def get_dns_blocklist_stats(time_range_hours: int = 24) -> List[Dict[str, Any]]:
+    """Get blocklist effectiveness statistics"""
+    query = f"""
+        SELECT
+            blocklist,
+            COUNT(*) as blocked_count,
+            COUNT(DISTINCT domain) as unique_domains,
+            COUNT(DISTINCT client) as unique_clients
+        FROM query
+        WHERE action = 'blocked'
+            AND time >= (NOW() - INTERVAL '{time_range_hours} hours')
+            AND blocklist IS NOT NULL
+            AND blocklist != ''
+        GROUP BY blocklist
+        ORDER BY blocked_count DESC
+    """
+
+    results = await opnsense_ssh_query(query)
+    colors = ['#dc3545', '#e74c3c', '#c0392b', '#a93226', '#922b21']
+
+    return [
+        {
+            "blocklist": row["blocklist"],
+            "blocked_count": row["blocked_count"],
+            "unique_domains": row["unique_domains"],
+            "unique_clients": row["unique_clients"],
+            "color": colors[i % len(colors)]
+        }
+        for i, row in enumerate(results)
+    ]
+
+async def get_dns_performance_stats(time_range_hours: int = 24) -> Dict[str, Any]:
+    """Get DNS performance metrics"""
+    query = f"""
+        SELECT
+            AVG(resolve_time_ms) as avg_resolve_time,
+            MIN(resolve_time_ms) as min_resolve_time,
+            MAX(resolve_time_ms) as max_resolve_time,
+            PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY resolve_time_ms) as median_resolve_time,
+            PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY resolve_time_ms) as p95_resolve_time
+        FROM query
+        WHERE time >= (NOW() - INTERVAL '{time_range_hours} hours')
+            AND resolve_time_ms IS NOT NULL
+            AND resolve_time_ms > 0
+    """
+
+    results = await opnsense_ssh_query(query)
+
+    if results and len(results) > 0:
+        row = results[0]
+        return {
+            "avg_ms": round(row.get("avg_resolve_time", 0), 2),
+            "min_ms": round(row.get("min_resolve_time", 0), 2),
+            "max_ms": round(row.get("max_resolve_time", 0), 2),
+            "median_ms": round(row.get("median_resolve_time", 0), 2),
+            "p95_ms": round(row.get("p95_resolve_time", 0), 2)
+        }
+
+    return {
+        "avg_ms": 0,
+        "min_ms": 0,
+        "max_ms": 0,
+        "median_ms": 0,
+        "p95_ms": 0
+    }
+
+async def get_dns_time_series(time_range_hours: int = 24, interval_minutes: int = 60) -> List[Dict[str, Any]]:
+    """Get DNS query time series data"""
+    query = f"""
+        SELECT
+            DATE_TRUNC('hour', time) as time_bucket,
+            COUNT(*) as total_queries,
+            SUM(CASE WHEN action = 'blocked' THEN 1 ELSE 0 END) as blocked_queries,
+            SUM(CASE WHEN action != 'blocked' THEN 1 ELSE 0 END) as allowed_queries
+        FROM query
+        WHERE time >= (NOW() - INTERVAL '{time_range_hours} hours')
+        GROUP BY time_bucket
+        ORDER BY time_bucket DESC
+    """
+
+    results = await opnsense_ssh_query(query)
+
+    return [
+        {
+            "time": row["time_bucket"],
+            "total": row["total_queries"],
+            "blocked": row["blocked_queries"],
+            "allowed": row["allowed_queries"]
+        }
+        for row in results
+    ]
+
+async def get_dns_dnssec_stats(time_range_hours: int = 24) -> Dict[str, Any]:
+    """Get DNSSEC statistics"""
+    query = f"""
+        SELECT
+            dnssec_status,
+            COUNT(*) as count
+        FROM query
+        WHERE time >= (NOW() - INTERVAL '{time_range_hours} hours')
+            AND dnssec_status IS NOT NULL
+            AND dnssec_status != ''
+        GROUP BY dnssec_status
+    """
+
+    results = await opnsense_ssh_query(query)
+
+    stats = {}
+    for row in results:
+        stats[row["dnssec_status"]] = row["count"]
+
+    return stats
 
 # Application lifecycle
 # Store previous values for rate calculation
@@ -600,165 +912,50 @@ async def get_opnsense_traffic():
         return traffic_data
 
 @app.get("/api/opnsense/unbound/stats")
-async def get_opnsense_unbound_stats():
-    """Get Unbound DNS statistics from OPNsense including blocklist data"""
+async def get_opnsense_unbound_stats(hours: int = Query(24, ge=1, le=168)):
+    """Get comprehensive Unbound DNS statistics from OPNsense DuckDB"""
     try:
-        print(f"[OPNsense] Fetching Unbound DNS statistics")
+        print(f"[DuckDB] Fetching Unbound DNS statistics for last {hours} hours")
 
-        # Parse and format the data for frontend
+        # Fetch all data concurrently
+        query_stats, query_types, top_domains, blocklist = await asyncio.gather(
+            get_dns_query_stats(hours),
+            get_dns_query_types(hours),
+            get_dns_top_domains(20, hours, allowed_only=True),
+            get_dns_blocked_domains(20, hours),
+            return_exceptions=True
+        )
+
+        # Handle exceptions from gather
+        if isinstance(query_stats, Exception):
+            print(f"[DuckDB] Error in query_stats: {query_stats}")
+            query_stats = {"resolved": 0, "blocked": 0, "cached": 0}
+
+        if isinstance(query_types, Exception):
+            print(f"[DuckDB] Error in query_types: {query_types}")
+            query_types = []
+
+        if isinstance(top_domains, Exception):
+            print(f"[DuckDB] Error in top_domains: {top_domains}")
+            top_domains = []
+
+        if isinstance(blocklist, Exception):
+            print(f"[DuckDB] Error in blocklist: {blocklist}")
+            blocklist = []
+
+        # Format response data for frontend
         response_data = {
-            "queryStats": [],
-            "queryTypes": [],
-            "topDomains": [],
-            "blocklist": []
+            "queryStats": [
+                {"name": "Resolved", "value": query_stats.get("resolved", 0), "color": "#28a745"},
+                {"name": "Blocked", "value": query_stats.get("blocked", 0), "color": "#dc3545"},
+                {"name": "Cached", "value": query_stats.get("cached", 0), "color": "#17a2b8"}
+            ],
+            "queryTypes": query_types,
+            "topDomains": top_domains,
+            "blocklist": blocklist
         }
 
-        # Try multiple possible API endpoints for Unbound statistics
-        # Different OPNsense versions may use different endpoints
-
-        # Method 1: Try /unbound/diagnostics/stats (standard stats endpoint)
-        stats_result = await opnsense_api_call('/unbound/diagnostics/stats')
-        print(f"[OPNsense] /unbound/diagnostics/stats result: {type(stats_result)}")
-
-        # Method 2: Try /unbound/service/dnsbl for DNSBL blocklist data
-        dnsbl_result = await opnsense_api_call('/unbound/service/dnsbl')
-        print(f"[OPNsense] /unbound/service/dnsbl result: {type(dnsbl_result)}")
-
-        # Method 3: Try /unbound/diagnostics/listInsecure for query log (might contain domains)
-        query_log = await opnsense_api_call('/unbound/diagnostics/listInsecure')
-        print(f"[OPNsense] /unbound/diagnostics/listInsecure result: {type(query_log)}")
-
-        # Method 4: Try alternative stats endpoint
-        alt_stats = await opnsense_api_call('/unbound/service/stats')
-        print(f"[OPNsense] /unbound/service/stats result: {type(alt_stats)}")
-
-        # Process general stats
-        stats_to_parse = stats_result or alt_stats
-        if stats_to_parse and isinstance(stats_to_parse, dict):
-            print(f"[OPNsense] Processing stats with keys: {list(stats_to_parse.keys())[:10]}")
-
-            # Extract query statistics (Unbound uses dot notation keys)
-            total_queries = 0
-            total_cachehits = 0
-
-            # Try different possible key formats
-            for key in stats_to_parse.keys():
-                if 'num.queries' in key.lower() or 'total.num.queries' in key:
-                    total_queries = int(stats_to_parse.get(key, 0))
-                if 'cachehits' in key.lower() or 'num.cachehits' in key:
-                    total_cachehits = int(stats_to_parse.get(key, 0))
-
-            # Calculate resolved (non-cached) queries
-            resolved = max(0, total_queries - total_cachehits)
-
-            response_data["queryStats"] = [
-                {"name": "Resolved", "value": resolved, "color": "#28a745"},
-                {"name": "Blocked", "value": 0, "color": "#dc3545"},  # Will be updated from DNSBL
-                {"name": "Cached", "value": total_cachehits, "color": "#17a2b8"}
-            ]
-
-            # Extract query types
-            query_types_map = {}
-            for key, value in stats_to_parse.items():
-                # Look for query type statistics (e.g., "num.query.type.A", "type.A", etc.)
-                if 'query.type.' in key or 'num.type.' in key:
-                    qtype = key.split('.')[-1].upper()  # Get the type (A, AAAA, etc.)
-                    if qtype and isinstance(value, (int, str)):
-                        try:
-                            query_types_map[qtype] = int(value)
-                        except (ValueError, TypeError):
-                            pass
-
-            if query_types_map:
-                colors = ['#d94f00', '#17a2b8', '#28a745', '#ffc107', '#dc3545', '#6c757d']
-                response_data["queryTypes"] = [
-                    {"type": qtype, "count": count, "color": colors[i % len(colors)]}
-                    for i, (qtype, count) in enumerate(sorted(query_types_map.items(), key=lambda x: x[1], reverse=True))
-                    if count > 0
-                ]
-
-        # Process DNSBL (blocklist) data
-        dnsbl_to_parse = dnsbl_result
-        if dnsbl_to_parse and isinstance(dnsbl_to_parse, dict):
-            print(f"[OPNsense] Processing DNSBL with keys: {list(dnsbl_to_parse.keys())}")
-
-            blocklist_data = []
-
-            # Try different possible structures
-            # Option 1: Direct 'blocked' key with domain:count pairs
-            if 'blocked' in dnsbl_to_parse and isinstance(dnsbl_to_parse['blocked'], dict):
-                for domain, count in dnsbl_to_parse['blocked'].items():
-                    if isinstance(count, (int, str)):
-                        try:
-                            blocklist_data.append({
-                                "domain": str(domain),
-                                "blocked": int(count),
-                                "color": "#dc3545"
-                            })
-                        except (ValueError, TypeError):
-                            pass
-
-            # Option 2: 'rows' array structure
-            elif 'rows' in dnsbl_to_parse and isinstance(dnsbl_to_parse['rows'], list):
-                for row in dnsbl_to_parse['rows']:
-                    if isinstance(row, dict):
-                        domain = row.get('domain', row.get('name', ''))
-                        count = row.get('count', row.get('blocked', row.get('hits', 0)))
-                        if domain:
-                            try:
-                                blocklist_data.append({
-                                    "domain": str(domain),
-                                    "blocked": int(count),
-                                    "color": "#dc3545"
-                                })
-                            except (ValueError, TypeError):
-                                pass
-
-            # Option 3: Direct key-value pairs in the root
-            else:
-                for key, value in dnsbl_to_parse.items():
-                    if isinstance(value, (int, str)) and not key.startswith('_'):
-                        try:
-                            count = int(value)
-                            if count > 0:
-                                blocklist_data.append({
-                                    "domain": str(key),
-                                    "blocked": count,
-                                    "color": "#dc3545"
-                                })
-                        except (ValueError, TypeError):
-                            pass
-
-            if blocklist_data:
-                # Sort by count and take top 20
-                blocklist_data.sort(key=lambda x: x['blocked'], reverse=True)
-                response_data["blocklist"] = blocklist_data[:20]
-
-                # Update blocked count in queryStats
-                total_blocked = sum(item['blocked'] for item in blocklist_data)
-                for stat in response_data["queryStats"]:
-                    if stat["name"] == "Blocked":
-                        stat["value"] = total_blocked
-
-        # Process query log for top domains if available
-        if query_log and isinstance(query_log, (dict, list)):
-            domain_counts = {}
-
-            if isinstance(query_log, dict) and 'rows' in query_log:
-                for row in query_log.get('rows', [])[:100]:  # Limit to recent 100
-                    if isinstance(row, dict):
-                        domain = row.get('domain', row.get('qname', ''))
-                        if domain:
-                            domain_counts[domain] = domain_counts.get(domain, 0) + 1
-
-            if domain_counts:
-                top_domains = [
-                    {"domain": domain, "queries": count}
-                    for domain, count in sorted(domain_counts.items(), key=lambda x: x[1], reverse=True)[:20]
-                ]
-                response_data["topDomains"] = top_domains
-
-        print(f"[OPNsense] Returning Unbound stats:")
+        print(f"[DuckDB] Returning Unbound stats:")
         print(f"  - Query stats: {len(response_data['queryStats'])} entries")
         print(f"  - Query types: {len(response_data['queryTypes'])} entries")
         print(f"  - Top domains: {len(response_data['topDomains'])} entries")
@@ -767,7 +964,7 @@ async def get_opnsense_unbound_stats():
         return response_data
 
     except Exception as e:
-        print(f"[OPNsense] Error fetching Unbound stats: {e}")
+        print(f"[DuckDB] Error fetching Unbound stats: {e}")
         import traceback
         traceback.print_exc()
         # Return empty data structure instead of raising error (allows frontend fallback)
@@ -777,6 +974,67 @@ async def get_opnsense_unbound_stats():
             "topDomains": [],
             "blocklist": []
         }
+
+# New comprehensive DNS analytics endpoints
+@app.get("/api/opnsense/unbound/blocked-domains")
+async def get_blocked_domains_endpoint(limit: int = Query(20, ge=1, le=100), hours: int = Query(24, ge=1, le=168)):
+    """Get top blocked domains"""
+    try:
+        results = await get_dns_blocked_domains(limit, hours)
+        return {"success": True, "data": results}
+    except Exception as e:
+        print(f"[DuckDB] Error in blocked-domains: {e}")
+        return {"success": False, "error": str(e), "data": []}
+
+@app.get("/api/opnsense/unbound/client-stats")
+async def get_client_stats_endpoint(limit: int = Query(20, ge=1, le=100), hours: int = Query(24, ge=1, le=168)):
+    """Get per-client DNS statistics"""
+    try:
+        results = await get_dns_client_stats(limit, hours)
+        return {"success": True, "data": results}
+    except Exception as e:
+        print(f"[DuckDB] Error in client-stats: {e}")
+        return {"success": False, "error": str(e), "data": []}
+
+@app.get("/api/opnsense/unbound/blocklist-stats")
+async def get_blocklist_stats_endpoint(hours: int = Query(24, ge=1, le=168)):
+    """Get blocklist effectiveness statistics"""
+    try:
+        results = await get_dns_blocklist_stats(hours)
+        return {"success": True, "data": results}
+    except Exception as e:
+        print(f"[DuckDB] Error in blocklist-stats: {e}")
+        return {"success": False, "error": str(e), "data": []}
+
+@app.get("/api/opnsense/unbound/performance")
+async def get_performance_endpoint(hours: int = Query(24, ge=1, le=168)):
+    """Get DNS performance metrics"""
+    try:
+        results = await get_dns_performance_stats(hours)
+        return {"success": True, "data": results}
+    except Exception as e:
+        print(f"[DuckDB] Error in performance: {e}")
+        return {"success": False, "error": str(e), "data": {}}
+
+@app.get("/api/opnsense/unbound/time-series")
+async def get_time_series_endpoint(hours: int = Query(24, ge=1, le=168), interval: int = Query(60, ge=5, le=1440)):
+    """Get DNS query time series data"""
+    try:
+        results = await get_dns_time_series(hours, interval)
+        return {"success": True, "data": results}
+    except Exception as e:
+        print(f"[DuckDB] Error in time-series: {e}")
+        return {"success": False, "error": str(e), "data": []}
+
+@app.get("/api/opnsense/unbound/dnssec")
+async def get_dnssec_endpoint(hours: int = Query(24, ge=1, le=168)):
+    """Get DNSSEC statistics"""
+    try:
+        results = await get_dns_dnssec_stats(hours)
+        return {"success": True, "data": results}
+    except Exception as e:
+        print(f"[DuckDB] Error in dnssec: {e}")
+        return {"success": False, "error": str(e), "data": {}}
 
 @app.get("/api/opnsense/test")
 async def test_opnsense_connection():

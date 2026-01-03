@@ -102,6 +102,9 @@ services:
     restart: unless-stopped
     ports:
       - "8000:8000"
+    volumes:
+      - ${SSH_KEY_PATH:-~/.ssh/id_rsa}:/root/.ssh/id_rsa:ro
+      - ${SSH_KNOWN_HOSTS:-~/.ssh/known_hosts}:/root/.ssh/known_hosts:ro
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-ntl_user}:${POSTGRES_PASSWORD:-changeme123}@postgres:5432/${POSTGRES_DB:-network_traffic}
       - INFLUXDB_URL=http://influxdb:8086
@@ -110,6 +113,8 @@ services:
       - INFLUXDB_BUCKET=${INFLUXDB_BUCKET:-traffic}
       - REDIS_URL=redis://redis:6379
       - SNMP_COMMUNITY=${SNMP_COMMUNITY:-public}
+      - OPNSENSE_SSH_HOST=${OPNSENSE_SSH_HOST:-10.10.1.1}
+      - OPNSENSE_SSH_USER=${OPNSENSE_SSH_USER:-netsentry}
     networks:
       - ntl_network
     depends_on:

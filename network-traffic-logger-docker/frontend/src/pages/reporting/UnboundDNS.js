@@ -11,6 +11,18 @@ import {
   Alert,
   IconButton,
   Tooltip,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  Chip,
 } from '@mui/material';
 import { Dns as DnsIcon, Refresh as RefreshIcon } from '@mui/icons-material';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip, ResponsiveContainer, Legend } from 'recharts';
@@ -31,6 +43,10 @@ export default function UnboundDNS() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [dnsData, setDnsData] = useState(null);
+  const [clientStats, setClientStats] = useState([]);
+  const [blocklistStats, setBlocklistStats] = useState([]);
+  const [performanceStats, setPerformanceStats] = useState({});
+  const [timeRange, setTimeRange] = useState(24); // hours
 
   // Fallback placeholder data
   const placeholderData = {
@@ -97,36 +113,50 @@ export default function UnboundDNS() {
     setLoading(true);
     setError(null);
     try {
-      // Fetch DNS statistics from OPNsense API
-      const response = await axios.get(`${API_URL}/opnsense/unbound/stats`);
+      // Fetch all DNS statistics from OPNsense DuckDB API
+      const [statsResponse, clientResponse, blocklistResponse, perfResponse] = await Promise.all([
+        axios.get(`${API_URL}/opnsense/unbound/stats?hours=${timeRange}`),
+        axios.get(`${API_URL}/opnsense/unbound/client-stats?hours=${timeRange}&limit=20`),
+        axios.get(`${API_URL}/opnsense/unbound/blocklist-stats?hours=${timeRange}`),
+        axios.get(`${API_URL}/opnsense/unbound/performance?hours=${timeRange}`)
+      ]);
 
       // Check if we got any real data
-      const hasRealData = response.data && (
-        (response.data.queryStats && response.data.queryStats.length > 0) ||
-        (response.data.blocklist && response.data.blocklist.length > 0) ||
-        (response.data.queryTypes && response.data.queryTypes.length > 0) ||
-        (response.data.topDomains && response.data.topDomains.length > 0)
+      const hasRealData = statsResponse.data && (
+        (statsResponse.data.queryStats && statsResponse.data.queryStats.length > 0) ||
+        (statsResponse.data.blocklist && statsResponse.data.blocklist.length > 0) ||
+        (statsResponse.data.queryTypes && statsResponse.data.queryTypes.length > 0) ||
+        (statsResponse.data.topDomains && statsResponse.data.topDomains.length > 0)
       );
 
       if (hasRealData) {
-        setDnsData(response.data);
+        setDnsData(statsResponse.data);
+        setClientStats(clientResponse.data.success ? clientResponse.data.data : []);
+        setBlocklistStats(blocklistResponse.data.success ? blocklistResponse.data.data : []);
+        setPerformanceStats(perfResponse.data.success ? perfResponse.data.data : {});
         setError(null);
       } else {
         // Backend returned empty data - OPNsense might not be configured
-        setError('Keine DNS-Statistiken verfügbar. Bitte stellen Sie sicher, dass:\n1. OPNsense in den Einstellungen konfiguriert ist\n2. Unbound DNS auf OPNsense aktiviert ist\n3. Die API-Credentials korrekt sind');
+        setError('Keine DNS-Statistiken verfügbar. Bitte stellen Sie sicher, dass:\n1. OPNsense in den Einstellungen konfiguriert ist\n2. Unbound DNS auf OPNsense aktiviert ist\n3. SSH-Zugriff vom Backend zu OPNsense konfiguriert ist');
         setDnsData(placeholderData);
+        setClientStats([]);
+        setBlocklistStats([]);
+        setPerformanceStats({});
       }
     } catch (error) {
       console.error('Error fetching Unbound DNS data:', error);
       if (error.response?.status === 500) {
-        setError('Fehler beim Abrufen der DNS-Statistiken von OPNsense. Bitte Backend-Logs prüfen.');
+        setError('Fehler beim Abrufen der DNS-Statistiken von OPNsense DuckDB. Bitte Backend-Logs und SSH-Verbindung prüfen.');
       } else if (error.response?.status === 404) {
-        setError('OPNsense API-Endpoint nicht gefunden. Bitte Backend-Version prüfen.');
+        setError('OPNsense DuckDB API-Endpoint nicht gefunden. Bitte Backend-Version prüfen.');
       } else {
-        setError('Verbindungsfehler zu OPNsense. Bitte Netzwerk und Einstellungen prüfen.');
+        setError('Verbindungsfehler zu OPNsense. Bitte Netzwerk, SSH-Zugriff und Einstellungen prüfen.');
       }
       // Use placeholder data as fallback
       setDnsData(placeholderData);
+      setClientStats([]);
+      setBlocklistStats([]);
+      setPerformanceStats({});
     } finally {
       setLoading(false);
     }
@@ -137,7 +167,7 @@ export default function UnboundDNS() {
     const interval = setInterval(fetchDNSData, 30000); // Refresh every 30 seconds
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [timeRange]);
 
   // Use fetched data or fallback to placeholder
   const queryStats = dnsData?.queryStats || placeholderData.queryStats;
@@ -154,11 +184,27 @@ export default function UnboundDNS() {
             Unbound DNS Statistics
           </Typography>
         </Box>
-        <Tooltip title="Aktualisieren">
-          <IconButton onClick={fetchDNSData} color="primary">
-            <RefreshIcon />
-          </IconButton>
-        </Tooltip>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <FormControl size="small" sx={{ minWidth: 150 }}>
+            <InputLabel>Zeitbereich</InputLabel>
+            <Select
+              value={timeRange}
+              label="Zeitbereich"
+              onChange={(e) => setTimeRange(e.target.value)}
+            >
+              <MenuItem value={1}>1 Stunde</MenuItem>
+              <MenuItem value={6}>6 Stunden</MenuItem>
+              <MenuItem value={24}>24 Stunden</MenuItem>
+              <MenuItem value={48}>48 Stunden</MenuItem>
+              <MenuItem value={168}>7 Tage</MenuItem>
+            </Select>
+          </FormControl>
+          <Tooltip title="Aktualisieren">
+            <IconButton onClick={fetchDNSData} color="primary">
+              <RefreshIcon />
+            </IconButton>
+          </Tooltip>
+        </Box>
       </Box>
 
       {error && (
@@ -174,11 +220,16 @@ export default function UnboundDNS() {
           value={tabValue}
           onChange={(e, newValue) => setTabValue(newValue)}
           sx={{ borderBottom: 1, borderColor: 'divider', px: 2 }}
+          variant="scrollable"
+          scrollButtons="auto"
         >
           <Tab label="Overview" />
           <Tab label="Query Types" />
           <Tab label="Top Domains" />
           <Tab label="Blocklist" />
+          <Tab label="Clients" />
+          <Tab label="Blocklist Effectiveness" />
+          <Tab label="Performance" />
         </Tabs>
 
         <CardContent>
@@ -318,6 +369,168 @@ export default function UnboundDNS() {
                 <Bar dataKey="blocked" fill="#dc3545" />
               </BarChart>
             </ResponsiveContainer>
+          </TabPanel>
+
+          {/* Clients Tab */}
+          <TabPanel value={tabValue} index={4}>
+            <Typography variant="h6" gutterBottom>Client DNS Statistics</Typography>
+            {clientStats && clientStats.length > 0 ? (
+              <TableContainer component={Paper} variant="outlined">
+                <Table>
+                  <TableHead>
+                    <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
+                      <TableCell><strong>Client IP</strong></TableCell>
+                      <TableCell align="right"><strong>Total Queries</strong></TableCell>
+                      <TableCell align="right"><strong>Allowed</strong></TableCell>
+                      <TableCell align="right"><strong>Blocked</strong></TableCell>
+                      <TableCell align="right"><strong>Block Rate</strong></TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {clientStats.map((client, index) => (
+                      <TableRow key={index} hover>
+                        <TableCell>{client.client}</TableCell>
+                        <TableCell align="right">{client.total_queries?.toLocaleString()}</TableCell>
+                        <TableCell align="right" sx={{ color: '#28a745' }}>
+                          {client.allowed?.toLocaleString()}
+                        </TableCell>
+                        <TableCell align="right" sx={{ color: '#dc3545' }}>
+                          {client.blocked?.toLocaleString()}
+                        </TableCell>
+                        <TableCell align="right">
+                          <Chip
+                            label={`${client.block_rate}%`}
+                            size="small"
+                            color={client.block_rate > 20 ? "error" : client.block_rate > 5 ? "warning" : "success"}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            ) : (
+              <Alert severity="info">Keine Client-Statistiken verfügbar</Alert>
+            )}
+          </TabPanel>
+
+          {/* Blocklist Effectiveness Tab */}
+          <TabPanel value={tabValue} index={5}>
+            <Typography variant="h6" gutterBottom>Blocklist Effectiveness</Typography>
+            {blocklistStats && blocklistStats.length > 0 ? (
+              <Grid container spacing={3}>
+                <Grid item xs={12} md={6}>
+                  <Typography variant="subtitle1" gutterBottom>Blocked Queries by List</Typography>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <PieChart>
+                      <Pie
+                        data={blocklistStats}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={100}
+                        paddingAngle={5}
+                        dataKey="blocked_count"
+                        label={({ blocklist, percent }) => `${blocklist}: ${(percent * 100).toFixed(0)}%`}
+                      >
+                        {blocklistStats.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <ChartTooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <Typography variant="subtitle1" gutterBottom>Blocklist Details</Typography>
+                  <TableContainer component={Paper} variant="outlined">
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
+                          <TableCell><strong>Blocklist</strong></TableCell>
+                          <TableCell align="right"><strong>Blocked</strong></TableCell>
+                          <TableCell align="right"><strong>Domains</strong></TableCell>
+                          <TableCell align="right"><strong>Clients</strong></TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {blocklistStats.map((list, index) => (
+                          <TableRow key={index} hover>
+                            <TableCell>{list.blocklist}</TableCell>
+                            <TableCell align="right">{list.blocked_count?.toLocaleString()}</TableCell>
+                            <TableCell align="right">{list.unique_domains?.toLocaleString()}</TableCell>
+                            <TableCell align="right">{list.unique_clients?.toLocaleString()}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                </Grid>
+              </Grid>
+            ) : (
+              <Alert severity="info">Keine Blocklist-Statistiken verfügbar</Alert>
+            )}
+          </TabPanel>
+
+          {/* Performance Tab */}
+          <TabPanel value={tabValue} index={6}>
+            <Typography variant="h6" gutterBottom>DNS Performance Metrics</Typography>
+            {performanceStats && Object.keys(performanceStats).length > 0 ? (
+              <Grid container spacing={3}>
+                <Grid item xs={12} sm={6} md={4}>
+                  <Card variant="outlined">
+                    <CardContent>
+                      <Typography variant="subtitle2" color="text.secondary">Average Response Time</Typography>
+                      <Typography variant="h4" sx={{ fontWeight: 600, color: '#17a2b8' }}>
+                        {performanceStats.avg_ms} ms
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+                <Grid item xs={12} sm={6} md={4}>
+                  <Card variant="outlined">
+                    <CardContent>
+                      <Typography variant="subtitle2" color="text.secondary">Median Response Time</Typography>
+                      <Typography variant="h4" sx={{ fontWeight: 600, color: '#28a745' }}>
+                        {performanceStats.median_ms} ms
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+                <Grid item xs={12} sm={6} md={4}>
+                  <Card variant="outlined">
+                    <CardContent>
+                      <Typography variant="subtitle2" color="text.secondary">95th Percentile</Typography>
+                      <Typography variant="h4" sx={{ fontWeight: 600, color: '#ffc107' }}>
+                        {performanceStats.p95_ms} ms
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+                <Grid item xs={12} sm={6} md={4}>
+                  <Card variant="outlined">
+                    <CardContent>
+                      <Typography variant="subtitle2" color="text.secondary">Minimum Response Time</Typography>
+                      <Typography variant="h4" sx={{ fontWeight: 600, color: '#28a745' }}>
+                        {performanceStats.min_ms} ms
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+                <Grid item xs={12} sm={6} md={4}>
+                  <Card variant="outlined">
+                    <CardContent>
+                      <Typography variant="subtitle2" color="text.secondary">Maximum Response Time</Typography>
+                      <Typography variant="h4" sx={{ fontWeight: 600, color: '#dc3545' }}>
+                        {performanceStats.max_ms} ms
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              </Grid>
+            ) : (
+              <Alert severity="info">Keine Performance-Daten verfügbar</Alert>
+            )}
           </TabPanel>
         </CardContent>
       </Card>
